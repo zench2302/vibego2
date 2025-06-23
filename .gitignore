@@ -1,2 +1,28 @@
+# Node.js dependencies
 node_modules/
+
+# Next.js build output
 .next/
+out/
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# Build directory
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS system files
+.DS_Store
+
+# Environment variables
+.env*
+.env.*.local
+
+# Vercel deployment
+.vercel/
