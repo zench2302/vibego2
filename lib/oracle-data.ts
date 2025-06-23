@@ -1,0 +1,72 @@
+export const oracleSteps = [
+  {
+    id: "archetype",
+    title: "Soul Archetype Discovery",
+    question: "Which essence resonates with your soul's everyday rhythm?",
+    subtitle: "Feel into your deepest nature...",
+    options: [
+      { value: "contemplative", label: "The Contemplative", emoji: "🧘", description: "Calm & reflective", colors: "from-blue-400 to-teal-500", bgColor: "bg-blue-500/20" },
+      { value: "spark", label: "The Spark", emoji: "🧨", description: "Energetic & outgoing", colors: "from-orange-400 to-red-500", bgColor: "bg-orange-500/20" },
+      { value: "seeker", label: "The Seeker", emoji: "🧠", description: "Curious & thoughtful", colors: "from-purple-400 to-indigo-500", bgColor: "bg-purple-500/20" },
+      { value: "creator", label: "The Creator", emoji: "🎨", description: "Creative & whimsical", colors: "from-pink-400 to-purple-500", bgColor: "bg-pink-500/20" },
+    ],
+  },
+  {
+    id: "mood",
+    title: "Present Moment Witness",
+    question: "What energy flows through you in this moment?",
+    subtitle: "Honor your current state...",
+    options: [
+      { value: "flowing", label: "Flowing", emoji: "😌", description: "Relaxed and easygoing", colors: "from-blue-300 to-green-400", bgColor: "bg-blue-400/20" },
+      { value: "refuge", label: "Seeking Refuge", emoji: "😵‍💫", description: "Stressed and need a break", colors: "from-orange-400 to-red-400", bgColor: "bg-orange-400/20" },
+      { value: "spark", label: "Craving Spark", emoji: "🥱", description: "Bored, need excitement", colors: "from-purple-400 to-yellow-400", bgColor: "bg-purple-400/20" },
+      { value: "deep", label: "Diving Deep", emoji: "🧠", description: "Reflective or introspective", colors: "from-indigo-500 to-gray-600", bgColor: "bg-indigo-500/20" },
+    ],
+  },
+  {
+    id: "philosophy",
+    title: "Journey Philosophy",
+    question: "How does your spirit prefer to dance with the unknown?",
+    subtitle: "Choose your sacred approach...",
+    options: [
+        { value: "architect", label: "The Architect", emoji: "📐", description: "Well-planned and detailed", colors: "from-gray-400 to-blue-500", bgColor: "bg-gray-500/20" },
+        { value: "wanderer", label: "The Wanderer", emoji: "🌙", description: "Spontaneous and open", colors: "from-purple-400 to-pink-500", bgColor: "bg-purple-500/20" },
+        { value: "harmonizer", label: "The Harmonizer", emoji: "⚖️", description: "Balanced mix of both", colors: "from-green-400 to-teal-500", bgColor: "bg-green-500/20" },
+        { value: "dreamer", label: "The Dreamer", emoji: "🌀", description: "Imaginative and intuitive", colors: "from-cyan-400 to-purple-500", bgColor: "bg-cyan-500/20" },
+    ],
+  },
+  {
+    id: "intention",
+    title: "Emotional Intention",
+    question: "Should this journey honor your current energy or transform it?",
+    subtitle: "Set your soul's intention...",
+    options: [
+      { value: "honor", label: "Honor", emoji: "🙏", description: "Match current mood", colors: "from-blue-400 to-purple-500", bgColor: "bg-blue-500/20" },
+      { value: "transform", label: "Transform", emoji: "🦋", description: "Shift current mood", colors: "from-orange-400 to-pink-500", bgColor: "bg-orange-500/20" },
+      { value: "discover", label: "Discover", emoji: "✨", description: "I'm not sure yet", colors: "from-yellow-400 to-purple-500", bgColor: "bg-yellow-500/20" },
+      { value: "heal", label: "Heal", emoji: "🌿", description: "Soothe and restore your energy", colors: "from-green-400 to-teal-500", bgColor: "bg-green-500/20" },
+    ],
+  },
+  {
+    id: "destinations",
+    title: "Soul Destinations",
+    question: "Which realms call to your spirit?",
+    subtitle: "Select all that resonate...",
+    multiSelect: true,
+    options: [
+      { value: "nature", label: "Natural Landscapes", emoji: "🏔️", description: "Mountains, forests, oceans", colors: "from-green-400 to-blue-500", bgColor: "bg-green-500/20" },
+      { value: "culture", label: "Cultural Wonders", emoji: "🏛️", description: "History, art, traditions", colors: "from-amber-400 to-orange-500", bgColor: "bg-amber-500/20" },
+      { value: "adventure", label: "Adventure Realms", emoji: "🎢", description: "Thrills and excitement", colors: "from-red-400 to-pink-500", bgColor: "bg-red-500/20" },
+      { value: "wellness", label: "Wellness Sanctuaries", emoji: "🌿", description: "Relaxation and healing", colors: "from-emerald-400 to-teal-500", bgColor: "bg-emerald-500/20" },
+      { value: "gastronomy", label: "Culinary Quests", emoji: "🍜", description: "Foodie explorations", colors: "from-yellow-400 to-orange-500", bgColor: "bg-yellow-500/20" },
+      { value: "urban", label: "Vibrant Cityscapes", emoji: "🏙️", description: "Bustling cities, modern life", colors: "from-indigo-400 to-slate-500", bgColor: "bg-indigo-500/20" },
+    ],
+  },
+  {
+    id: "practical",
+    title: "Journey Logistics",
+    question: "Finally, let's ground your journey in reality.",
+    subtitle: "Define the canvas for your adventure...",
+    practical: true,
+  },
+] 
