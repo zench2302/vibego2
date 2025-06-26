@@ -50,8 +50,9 @@ export async function POST(req: Request) {
       3. For every single 'activity' and 'restaurant', you MUST provide a real, verifiable street address.
       4. The name and address MUST correspond to a real-world location. Do not invent places.
       5. The ENTIRE itinerary must take place within the user's specified 'destination'. Do not suggest locations in other cities.
+      6. The number of days in 'dailyItinerary' MUST exactly match the number of days between 'startDate' and 'endDate' (inclusive) in the user's profile (practical.startDate and practical.endDate). For example, if startDate is 2025-06-01 and endDate is 2025-06-05, you MUST generate 5 days, one for each date in the range.
 
-      Here is the user's soul profile, which includes the destination:
+      Here is the user's soul profile, which includes the destination and date range:
       \`\`\`json
       ${JSON.stringify(soulProfile, null, 2)}
     `

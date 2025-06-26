@@ -191,10 +191,32 @@ export default function PersonalityQuiz({ onComplete }: PersonalityQuizProps) {
             <Sparkles className="h-6 w-6 text-purple-600" />
             <CardTitle className="text-2xl font-bold text-gray-800">Discover Your Travel Vibe</CardTitle>
           </div>
-          <CardDescription className="text-lg">
-            Question {currentQuestion + 1} of {questions.length}
-          </CardDescription>
-          <Progress value={progress} className="mt-4" />
+          <div className="flex flex-col items-center gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              {questions.map((q, idx) => {
+                const answered = typeof answers[q.id] !== 'undefined';
+                const isCurrent = idx === currentQuestion;
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    disabled={!answered && !isCurrent}
+                    onClick={() => setCurrentQuestion(idx)}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-200
+                      ${isCurrent ? 'bg-gradient-to-br from-purple-500 to-blue-400 border-purple-600 text-white scale-110 shadow-lg' : ''}
+                      ${answered && !isCurrent ? 'bg-purple-200 border-purple-400 text-purple-700 hover:scale-105' : ''}
+                      ${!answered && !isCurrent ? 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed' : ''}
+                    `}
+                    aria-label={`Go to question ${idx + 1}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-sm text-gray-600 font-medium">Question {currentQuestion + 1} / {questions.length}</span>
+          </div>
+          <Progress value={progress} className="mt-2" />
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -203,18 +225,30 @@ export default function PersonalityQuiz({ onComplete }: PersonalityQuizProps) {
           </div>
 
           <RadioGroup value={answers[currentQ.id] || ""} onValueChange={handleAnswer} className="space-y-3">
-            {currentQ.options.map((option) => (
-              <div
-                key={option.value}
-                className="flex items-center space-x-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <RadioGroupItem value={option.value} id={option.value} />
-                <Label htmlFor={option.value} className="flex items-center gap-3 cursor-pointer flex-1 text-base">
-                  <span className="text-2xl">{option.emoji}</span>
-                  <span>{option.label}</span>
-                </Label>
-              </div>
-            ))}
+            {currentQ.options.map((option) => {
+              const isSelected = answers[currentQ.id] === option.value;
+              return (
+                <div
+                  key={option.value}
+                  className={`flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-pointer
+                    ${isSelected
+                      ? 'border-2 border-purple-500 bg-purple-100/60 shadow-lg scale-105'
+                      : 'border-gray-200 hover:bg-gray-50'}
+                  `}
+                  onClick={() => handleAnswer(option.value)}
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleAnswer(option.value); }}
+                  role="button"
+                  aria-pressed={isSelected}
+                >
+                  <RadioGroupItem value={option.value} id={option.value} />
+                  <Label htmlFor={option.value} className="flex items-center gap-3 cursor-pointer flex-1 text-base">
+                    <span className="text-2xl">{option.emoji}</span>
+                    <span>{option.label}</span>
+                  </Label>
+                </div>
+              );
+            })}
           </RadioGroup>
 
           <div className="flex justify-between pt-6">

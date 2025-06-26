@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import PreDepartureOracle from "./components/pre-departure-oracle"
 import ItineraryDisplay from "./components/itinerary-display"
 import SharingRealm from "./components/sharing-realm"
@@ -15,6 +15,7 @@ type AppState = "intro" | "auth" | "oracle" | "journey" | "sharing"
 
 export default function MysticalTripOracle() {
   const { user, loading } = useAuth();
+  const prevUserRef = useRef(user);
   
   // App-specific state
   const [currentState, setCurrentState] = useState<AppState>("intro")
@@ -28,6 +29,21 @@ export default function MysticalTripOracle() {
       setCurrentState("oracle")
     }
   }, [user, currentState])
+
+  useEffect(() => {
+    if (
+      !loading &&
+      prevUserRef.current &&
+      user === null &&
+      currentState !== "auth"
+    ) {
+      setCurrentState("auth");
+      setSoulProfile(null);
+      setJourneyBlueprint(null);
+      setCompletedItems(new Set());
+    }
+    prevUserRef.current = user;
+  }, [user, loading, currentState]);
 
   const handleToggleComplete = (itemId: string) => {
     setCompletedItems(prev => {
@@ -63,6 +79,14 @@ export default function MysticalTripOracle() {
   }
   
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-300"></div>
+        </div>
+      );
+    }
+
     // If user is not authenticated, show intro or auth
     if (!user) {
       if (currentState === "intro") {
@@ -125,7 +149,7 @@ export default function MysticalTripOracle() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => setCurrentState("auth")}
+                    onClick={() => setCurrentState("oracle")}
                     size="lg"
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
                   >
@@ -137,9 +161,11 @@ export default function MysticalTripOracle() {
             </div>
           </div>
         )
-      } else {
-        return <AuthScreen onBack={() => setCurrentState("intro")} />
       }
+      if (currentState === "oracle") {
+        return <PreDepartureOracle onComplete={handleOracleComplete} onBack={handleCreateNewJourney} />
+      }
+      return <AuthScreen onBack={() => setCurrentState("intro")} />
     }
 
     // User is authenticated - show app content
@@ -192,14 +218,6 @@ export default function MysticalTripOracle() {
 
     // Fallback - if somehow we get here, show the oracle
     return <PreDepartureOracle onComplete={handleOracleComplete} onBack={handleCreateNewJourney} />
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-300"></div>
-      </div>
-    );
   }
 
   return (

@@ -12,15 +12,17 @@ import { Sparkles, ArrowLeft } from 'lucide-react';
 
 interface AuthScreenProps {
   onBack?: () => void;
+  onAuthStart?: () => void;
 }
 
-export default function AuthScreen({ onBack }: AuthScreenProps) {
+export default function AuthScreen({ onBack, onAuthStart }: AuthScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleAuthAction = async (action: 'signIn' | 'signUp') => {
+    if (onAuthStart) onAuthStart();
     setLoading(true);
     setError(null);
     try {

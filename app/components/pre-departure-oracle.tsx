@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, ChangeEvent } from "react"
+import { useState, ChangeEvent, useMemo, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Sparkles, Star, Heart, Compass, ArrowLeft } from "lucide-react"
 import { oracleSteps } from "@/lib/oracle-data"
+import { useAuth } from "../context/auth-context"
+import AuthScreen from "./auth-screen"
 
 type FormData = {
   archetype: string
@@ -27,6 +29,38 @@ interface PreDepartureOracleProps {
   onBack?: () => void
 }
 
+// 静态城市/国家列表
+const DESTINATION_LIST = [
+  "London", "Istanbul", "Vienna", "Paris", "New York", "Tokyo", "Sydney", "Berlin", "Rome", "Barcelona", "Beijing", "Shanghai", "Moscow", "Dubai", "Bangkok", "Singapore", "Los Angeles", "San Francisco", "Toronto", "Seoul", "Hong Kong"
+];
+
+const COUNTRY_API = "https://restcountries.com/v3.1/all";
+const CITIES_API = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities";
+
+// 顶层定义 transformFormData
+function transformFormData(formData: FormData) {
+  const transformed: any = {};
+  oracleSteps.forEach(step => {
+    if (step.id === 'practical') return;
+    const value = formData[step.id as keyof FormData];
+    if (step.multiSelect) {
+      transformed[step.id] = Array.isArray(value) ? value : [];
+    } else {
+      const option = step.options?.find(opt => opt.value === value);
+      if (option) transformed[step.id] = option;
+    }
+  });
+  transformed.practical = {
+    destination: formData.destination,
+    startDate: formData.startDate,
+    endDate: formData.endDate,
+    budget: formData.budget,
+    companions: formData.companions,
+    specialRequests: formData.specialRequests,
+  };
+  return transformed;
+}
+
 export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureOracleProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState<FormData>({
@@ -42,6 +76,67 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     budget: 2000,
     specialRequests: "",
   })
+  const [destinationQuery, setDestinationQuery] = useState("");
+  const [destinationDropdown, setDestinationDropdown] = useState(false);
+  const [cityOptions, setCityOptions] = useState<{label: string, value: string, key: string}[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const { user } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [pendingItinerary, setPendingItinerary] = useState<any>(null);
+
+  // 只允许选择下拉项
+  const validOptions = useMemo(() => [
+    ...cityOptions.map(opt => opt.value)
+  ], [cityOptions]);
+
+  // 动态获取城市
+  const fetchOptions = async (query: string) => {
+    setLoadingOptions(true);
+    // GeoDB Cities
+    let cities: {label: string, value: string, key: string}[] = [];
+    try {
+      const res = await fetch(`${CITIES_API}?namePrefix=${encodeURIComponent(query)}&limit=8&sort=-population`, {
+        headers: {
+          'X-RapidAPI-Key': process.env.NEXT_PUBLIC_GEODB_API_KEY!,
+          'X-RapidAPI-Host': 'wft-geo-db.p.rapidapi.com'
+        }
+      });
+      const data = await res.json();
+      if (data.data) {
+        cities = data.data.map((c: any, idx: number) => ({
+          label: `${c.city}, ${c.country}`,
+          value: `${c.city}, ${c.country}`,
+          key: c.id ? `${c.id}` : `${c.city},${c.country},${idx}`
+        }));
+      }
+    } catch {}
+    setCityOptions(cities);
+    setLoadingOptions(false);
+  };
+
+  // 输入时debounce并请求
+  const handleDestinationInput = (e: ChangeEvent<HTMLInputElement>) => {
+    const q = e.target.value;
+    setDestinationQuery(q);
+    setDestinationDropdown(true);
+    setFormData(prev => ({ ...prev, destination: q }));
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      if (q.trim()) fetchOptions(q.trim());
+      else {
+        setCityOptions([]);
+      }
+    }, 300);
+  };
+
+  const handleDestinationSelect = (val: string) => {
+    setFormData(prev => ({ ...prev, destination: val }));
+    setDestinationQuery(val);
+    setDestinationDropdown(false);
+  };
 
   const currentStepData = oracleSteps[currentStep]
 
@@ -73,31 +168,84 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     setFormData(prev => ({...prev, [name]: name === 'budget' ? Number(value) : value }))
   }
 
-  const handleNext = () => {
-    if (currentStep < oracleSteps.length - 1) {
-      setCurrentStep((prev) => prev + 1)
+  // 登录弹窗的 onAuthStart
+  function handleAuthStart() {
+    setShowAuthModal(false);
+    setIsGenerating(true);
+  }
+
+  // 登录后自动进入 loading 并生成 itinerary
+  useEffect(() => {
+    if (user && isGenerating && !pendingItinerary) {
+      const finalAnswers = transformFormData(formData);
+      fetch("/api/generate-itinerary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soulProfile: finalAnswers })
+      })
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to generate itinerary");
+          return res.json();
+        })
+        .then(data => {
+          setIsGenerating(false);
+          setPendingItinerary(data);
+        })
+        .catch(() => {
+          setGenerationError("Failed to generate itinerary. Please try again later.");
+          setIsGenerating(false);
+        });
+    }
+    // eslint-disable-next-line
+  }, [user, isGenerating]);
+
+  // itinerary 生成完毕后，onComplete
+  useEffect(() => {
+    if (pendingItinerary) {
+      onComplete(pendingItinerary);
+      setPendingItinerary(null);
+    }
+  }, [pendingItinerary, onComplete]);
+
+  const handleComplete = async () => {
+    if (!user) {
+      setShowAuthModal(true);
+      setIsGenerating(false);
+      setGenerationError(null);
     } else {
-      // All steps are complete, pass the final data up
-      const finalAnswers = {
-        ...formData,
-        // Pass practical details nested as the API expects
-        practical: {
-          destination: formData.destination,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          budget: formData.budget,
-          companions: formData.companions,
-          specialRequests: formData.specialRequests,
-        }
+      setIsGenerating(true);
+      setGenerationError(null);
+      const finalAnswers = transformFormData(formData);
+      try {
+        const res = await fetch("/api/generate-itinerary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ soulProfile: finalAnswers })
+        });
+        if (!res.ok) throw new Error("Failed to generate itinerary");
+        const data = await res.json();
+        setIsGenerating(false);
+        onComplete(data);
+      } catch {
+        setGenerationError("Failed to generate itinerary. Please try again later.");
+        setIsGenerating(false);
       }
-      onComplete(finalAnswers)
+    }
+  }
+
+  const handleNextStep = () => {
+    if (currentStep < oracleSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      handleComplete();
     }
   }
 
   const canProceed = () => {
     const id = currentStepData.id as keyof FormData
     if (currentStepData.practical) {
-      return formData.destination && formData.startDate && formData.endDate
+      // destination 必须是下拉项之一
+      return validOptions.includes(formData.destination) && formData.startDate && formData.endDate
     }
     const value = formData[id]
     return Array.isArray(value) ? value.length > 0 : !!value
@@ -106,6 +254,26 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
   if (currentStepData.practical) {
     return (
       <div className={`min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 ${getMoodBackground()} transition-all duration-1000`}>
+        {/* 登录弹窗 */}
+        {showAuthModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="relative w-full max-w-lg mx-auto">
+              <AuthScreen onBack={() => setShowAuthModal(false)} onAuthStart={handleAuthStart} />
+              {isGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <div className="bg-white/90 rounded-lg px-6 py-4 text-center shadow-xl">
+                    <span className="text-lg font-semibold text-purple-700">Preparing your mystical journey...</span>
+                  </div>
+                </div>
+              )}
+              {generationError && (
+                <div className="absolute bottom-0 left-0 right-0 bg-red-100 text-red-700 text-center py-2 rounded-b-lg">
+                  {generationError}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-screen">
           {onBack && (
             <Button
@@ -126,7 +294,25 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                   {currentStepData.title}
                 </CardTitle>
               </div>
-              <Progress value={((currentStep + 1) / oracleSteps.length) * 100} className="mt-4 bg-white/10" />
+              <div className="w-full flex flex-col items-center gap-2 mb-2">
+                <div className="relative w-full max-w-xl h-4 flex items-center">
+                  {oracleSteps.map((step, idx) => {
+                    const total = oracleSteps.length;
+                    const width = 100 / total;
+                    return (
+                      <div
+                        key={step.id}
+                        style={{ left: `calc(${(idx / total) * 100}% - 2px)`, width: `calc(${width}% + 2px)`, zIndex: 2, height: '100%' }}
+                        className={
+                          'absolute rounded-full transition-all duration-200 h-4 bg-gradient-to-r from-purple-500 to-blue-400 shadow-lg border-2 border-white/40 scale-110'
+                        }
+                      />
+                    );
+                  })}
+                  <div className="absolute left-0 top-0 w-full h-4 bg-gray-400/30 rounded-full -z-10" />
+                </div>
+                <span className="text-sm text-gray-300 font-medium">Step {oracleSteps.length} / {oracleSteps.length}</span>
+              </div>
             </CardHeader>
 
             <CardContent className="space-y-8">
@@ -136,16 +322,37 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+                <div className="space-y-4 relative">
                   <label className="block text-sm font-medium text-slate-200">Destination</label>
                   <input
                     type="text"
                     name="destination"
-                    placeholder="Where does your soul wish to wander?"
-                    value={formData.destination}
-                    onChange={handleInputChange}
+                    autoComplete="off"
+                    placeholder="Type to search for a city"
+                    value={destinationQuery}
+                    onChange={handleDestinationInput}
+                    onFocus={() => setDestinationDropdown(true)}
+                    onBlur={() => setTimeout(() => setDestinationDropdown(false), 150)}
                     className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-purple-400 focus:outline-none backdrop-blur-sm"
                   />
+                  {/* 下拉选择框，仅城市 */}
+                  {destinationDropdown && cityOptions.length > 0 && (
+                    <div className="absolute z-20 mt-1 w-full bg-white/90 rounded-lg shadow-lg max-h-64 overflow-auto">
+                      {cityOptions.map(opt => (
+                        <div
+                          key={opt.key}
+                          onMouseDown={() => handleDestinationSelect(opt.value)}
+                          className={`px-4 py-2 cursor-pointer hover:bg-purple-100 text-gray-800 ${opt.value === formData.destination ? 'bg-purple-200 font-bold' : ''}`}
+                        >
+                          {opt.label}
+                        </div>
+                      ))}
+                      {loadingOptions && <div className="px-4 py-2 text-gray-400 text-sm">Loading...</div>}
+                      {!loadingOptions && cityOptions.length === 0 && (
+                        <div className="px-4 py-2 text-gray-400 text-sm">No results</div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -180,6 +387,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                     type="date"
                     name="endDate"
                     value={formData.endDate}
+                    min={formData.startDate || undefined}
                     onChange={handleInputChange}
                     className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white focus:border-purple-400 focus:outline-none backdrop-blur-sm"
                   />
@@ -187,16 +395,27 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
 
                 <div className="md:col-span-2 space-y-4">
                   <label className="block text-sm font-medium text-slate-200">Sacred Budget Range</label>
-                  <input
-                    type="range"
-                    name="budget"
-                    min="0"
-                    max="5000"
-                    step="100"
-                    value={formData.budget}
-                    onChange={handleInputChange}
-                    className="w-full accent-purple-500"
-                  />
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      name="budget"
+                      min="0"
+                      max="5000"
+                      step="100"
+                      value={formData.budget}
+                      onChange={handleInputChange}
+                      className="w-full accent-purple-500"
+                    />
+                    <input
+                      type="number"
+                      name="budget"
+                      min="0"
+                      value={formData.budget}
+                      onChange={handleInputChange}
+                      className="w-28 p-2 rounded-lg bg-white/10 border border-white/20 text-white focus:border-purple-400 focus:outline-none backdrop-blur-sm text-right"
+                      placeholder="Custom"
+                    />
+                  </div>
                   <div className="text-center text-slate-200">
                     {formData.budget === 5000 ? "$5000+" : `$${formData.budget}`}
                   </div>
@@ -217,8 +436,8 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
 
               <div className="text-center pt-6">
                 <Button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
+                  onClick={handleComplete}
+                  disabled={!canProceed() || isGenerating}
                   size="lg"
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
                 >
@@ -233,6 +452,16 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     )
   }
   
+  // loading页渲染
+  if (isGenerating && !showAuthModal) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mb-6"></div>
+        <div className="text-xl font-semibold text-purple-200 mt-6">Preparing your mystical journey...</div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 ${getMoodBackground()} transition-all duration-1000`}>
       <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-screen">
@@ -266,7 +495,40 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                 {currentStepData.title}
               </CardTitle>
             </div>
-            <Progress value={((currentStep + 1) / oracleSteps.length) * 100} className="mt-4 bg-white/10" />
+            <div className="w-full flex flex-col items-center gap-2 mb-2">
+              <div className="relative w-full max-w-xl h-4 flex items-center">
+                {oracleSteps.map((step, idx) => {
+                  const total = oracleSteps.length;
+                  const width = 100 / total;
+                  const answered = (() => {
+                    const id = step.id as keyof FormData;
+                    const value = formData[id];
+                    return Array.isArray(value) ? value.length > 0 : !!value;
+                  })();
+                  const isCurrent = idx === currentStep;
+                  const isActive = isCurrent || answered;
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      disabled={!answered && !isCurrent}
+                      onClick={() => setCurrentStep(idx)}
+                      style={{ left: `calc(${(idx / total) * 100}% - 2px)`, width: `calc(${width}% + 2px)`, zIndex: isCurrent ? 2 : 1, height: '100%' }}
+                      className={`absolute rounded-full transition-all duration-200 h-4
+                        ${isActive ? 'bg-gradient-to-r from-purple-500 to-blue-400 shadow-lg' : 'bg-gray-200'}
+                        border-2 border-white/40
+                        ${isCurrent ? 'scale-110' : ''}
+                        ${answered && !isCurrent ? 'hover:scale-105' : ''}
+                        ${!answered && !isCurrent ? 'cursor-not-allowed' : ''}
+                      `}
+                      aria-label={`Go to step ${idx + 1}`}
+                    />
+                  );
+                })}
+                <div className="absolute left-0 top-0 w-full h-4 bg-gray-400/30 rounded-full -z-10" />
+              </div>
+              <span className="text-sm text-gray-300 font-medium">Step {currentStep + 1} / {oracleSteps.length}</span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-8">
             <div className="text-center">
@@ -287,21 +549,19 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                     onClick={() => currentStepData.multiSelect ? handleMultiSelect(option.value) : handleSingleSelect(id, option.value)}
                     className={`group cursor-pointer p-6 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
                       isSelected
-                        ? `border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/10`
+                        ? `border-purple-500 bg-purple-100/60 shadow-lg scale-105`
                         : `border-white/20 bg-white/5 hover:border-purple-400/50`
                     }`}
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') currentStepData.multiSelect ? handleMultiSelect(option.value) : handleSingleSelect(id, option.value); }}
+                    role="button"
+                    aria-pressed={isSelected}
                   >
                     <div className="flex items-start gap-4">
-                      <div className={`text-4xl transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'}`}>
-                        {option.emoji}
-                      </div>
+                      <div className={`text-4xl transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'}`}>{option.emoji}</div>
                       <div>
-                        <h4 className={`text-lg font-bold transition-colors duration-300 ${isSelected ? 'text-purple-200' : 'text-slate-100'}`}>
-                          {option.label}
-                        </h4>
-                        <p className={`transition-colors duration-300 ${isSelected ? 'text-purple-300' : 'text-slate-300'}`}>
-                          {option.description}
-                        </p>
+                        <h4 className={`text-lg font-bold transition-colors duration-300 ${isSelected ? 'text-purple-700' : 'text-slate-100'}`}>{option.label}</h4>
+                        <p className={`transition-colors duration-300 ${isSelected ? 'text-purple-500' : 'text-slate-300'}`}>{option.description}</p>
                       </div>
                     </div>
                   </div>
@@ -311,8 +571,8 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
 
             <div className="text-center pt-6">
               <Button
-                onClick={handleNext}
-                disabled={!canProceed()}
+                onClick={handleNextStep}
+                disabled={!canProceed() || isGenerating}
                 size="lg"
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
               >
