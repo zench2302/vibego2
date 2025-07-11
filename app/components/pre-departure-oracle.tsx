@@ -86,6 +86,8 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [pendingItinerary, setPendingItinerary] = useState<any>(null);
+  // 1. 增加搜索历史 state
+  const [destinationHistory, setDestinationHistory] = useState<string[]>([]);
 
   // 只允许选择下拉项
   const validOptions = useMemo(() => [
@@ -132,11 +134,23 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     }, 300);
   };
 
+  // 在 handleDestinationSelect 里保存历史
   const handleDestinationSelect = (val: string) => {
     setFormData(prev => ({ ...prev, destination: val }));
     setDestinationQuery(val);
     setDestinationDropdown(false);
+    setDestinationHistory(prev => {
+      const newHistory = [val, ...prev.filter(item => item !== val)].slice(0, 3);
+      localStorage.setItem('destinationHistory', JSON.stringify(newHistory));
+      return newHistory;
+    });
   };
+
+  // 初始化时从 localStorage 读取历史
+  useEffect(() => {
+    const history = localStorage.getItem('destinationHistory');
+    if (history) setDestinationHistory(JSON.parse(history));
+  }, []);
 
   const currentStepData = oracleSteps[currentStep]
 
@@ -208,28 +222,28 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
   }, [pendingItinerary, onComplete]);
 
   const handleComplete = async () => {
-    if (!user) {
-      setShowAuthModal(true);
+    console.log('handleComplete called');
+    const finalAnswers = transformFormData(formData);
+    console.log('finalAnswers:', finalAnswers);
+    setIsGenerating(true);
+    setGenerationError(null);
+    try {
+      const res = await fetch("/api/generate-itinerary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soulProfile: finalAnswers })
+      });
+      if (!res.ok) throw new Error("Failed to generate itinerary");
+      const data = await res.json();
       setIsGenerating(false);
-      setGenerationError(null);
-    } else {
-      setIsGenerating(true);
-      setGenerationError(null);
-      const finalAnswers = transformFormData(formData);
-      try {
-        const res = await fetch("/api/generate-itinerary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ soulProfile: finalAnswers })
-        });
-        if (!res.ok) throw new Error("Failed to generate itinerary");
-        const data = await res.json();
-        setIsGenerating(false);
-        onComplete(data);
-      } catch {
-        setGenerationError("Failed to generate itinerary. Please try again later.");
-        setIsGenerating(false);
-      }
+      // 合并 practical 字段，确保 itinerary 页面能拿到 quiz 输入
+      const merged = { ...data, practical: finalAnswers.practical };
+      console.log('onComplete will be called with:', merged);
+      onComplete(merged);
+    } catch (e) {
+      setGenerationError("Failed to generate itinerary. Please try again later.");
+      setIsGenerating(false);
+      console.error(e);
     }
   }
 
@@ -353,6 +367,20 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                       )}
                     </div>
                   )}
+                  {destinationDropdown && destinationHistory.length > 0 && (
+                    <div className="absolute z-20 mt-1 w-full bg-white rounded-lg shadow-lg max-h-32 overflow-auto top-full left-0">
+                      <div className="px-4 py-2 text-xs text-gray-500">Recent Searches</div>
+                      {destinationHistory.map((item, idx) => (
+                        <div
+                          key={item + idx}
+                          onMouseDown={() => handleDestinationSelect(item)}
+                          className="px-4 py-2 cursor-pointer hover:bg-purple-100 text-gray-800"
+                        >
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -394,7 +422,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                 </div>
 
                 <div className="md:col-span-2 space-y-4">
-                  <label className="block text-sm font-medium text-slate-200">Sacred Budget Range</label>
+                  <label className="block text-sm font-medium text-slate-200">Sacred Budget ($)</label>
                   <div className="flex items-center gap-4">
                     <input
                       type="range"
@@ -407,7 +435,9 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                       className="w-full accent-purple-500"
                     />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       name="budget"
                       min="0"
                       value={formData.budget}
@@ -415,9 +445,6 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                       className="w-28 p-2 rounded-lg bg-white/10 border border-white/20 text-white focus:border-purple-400 focus:outline-none backdrop-blur-sm text-right"
                       placeholder="Custom"
                     />
-                  </div>
-                  <div className="text-center text-slate-200">
-                    {formData.budget === 5000 ? "$5000+" : `$${formData.budget}`}
                   </div>
                 </div>
 
@@ -437,7 +464,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
               <div className="text-center pt-6">
                 <Button
                   onClick={handleComplete}
-                  disabled={!canProceed() || isGenerating}
+                  disabled={isGenerating}
                   size="lg"
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
                 >
@@ -536,7 +563,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
               <p className="text-slate-300">{currentStepData.subtitle}</p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-2">
               {currentStepData.options && currentStepData.options.map((option) => {
                 const id = currentStepData.id as keyof FormData
                 const isSelected = currentStepData.multiSelect
@@ -547,9 +574,9 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                   <div
                     key={option.value}
                     onClick={() => currentStepData.multiSelect ? handleMultiSelect(option.value) : handleSingleSelect(id, option.value)}
-                    className={`group cursor-pointer p-6 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
-                      isSelected
-                        ? `border-purple-500 bg-purple-100/60 shadow-lg scale-105`
+                    className={`group cursor-pointer p-2 rounded-lg border transition-all duration-200
+                      ${isSelected
+                        ? `border-purple-500 bg-purple-100/60 shadow-md scale-105`
                         : `border-white/20 bg-white/5 hover:border-purple-400/50`
                     }`}
                     tabIndex={0}
@@ -557,11 +584,11 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                     role="button"
                     aria-pressed={isSelected}
                   >
-                    <div className="flex items-start gap-4">
-                      <div className={`text-4xl transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'}`}>{option.emoji}</div>
+                    <div className="flex items-start gap-2">
+                      <div className="text-2xl">{option.emoji}</div>
                       <div>
-                        <h4 className={`text-lg font-bold transition-colors duration-300 ${isSelected ? 'text-purple-700' : 'text-slate-100'}`}>{option.label}</h4>
-                        <p className={`transition-colors duration-300 ${isSelected ? 'text-purple-500' : 'text-slate-300'}`}>{option.description}</p>
+                        <h4 className={`text-base font-semibold ${isSelected ? 'text-purple-700' : 'text-slate-100'}`}>{option.label}</h4>
+                        <p className={`text-sm ${isSelected ? 'text-purple-500' : 'text-slate-300'}`}>{option.description}</p>
                       </div>
                     </div>
                   </div>

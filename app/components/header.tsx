@@ -27,19 +27,6 @@ export default function Header({ user }: HeaderProps) {
           {user && (
             <>
               <nav className="hidden sm:flex items-center gap-2">
-                <Link href="/">
-                  <Button 
-                    variant={pathname === "/" ? "default" : "ghost"} 
-                    size="sm" 
-                    className={pathname === "/" 
-                      ? "bg-purple-600 text-white hover:bg-purple-700" 
-                      : "text-gray-700 hover:bg-gray-100"
-                    }
-                  >
-                    <Home className="w-4 h-4 mr-1.5" />
-                    Create Journey
-                  </Button>
-                </Link>
                 <Link href="/journeys">
                   <Button 
                     variant={pathname === "/journeys" ? "default" : "ghost"} 
@@ -81,7 +68,7 @@ export default function Header({ user }: HeaderProps) {
                 </Link>
               </nav>
               <div className="flex items-center gap-2 sm:gap-3 border-l border-gray-200 pl-3 sm:pl-4">
-                <p className="text-gray-700 text-sm hidden lg:block font-medium">
+                <p className="text-gray-700 text-sm block font-medium">
                   Welcome, <span className="text-purple-600">{user.email?.split('@')[0]}</span>
                 </p>
                 <Button 

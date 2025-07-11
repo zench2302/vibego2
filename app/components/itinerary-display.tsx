@@ -166,7 +166,7 @@ export default function ItineraryDisplay({
     message: '',
     type: 'success',
     isVisible: false,
-    onClose: () => setToast(prev => ({ ...prev, isVisible: false }))
+    onClose: () => setToast(prev => ({ ...prev, isVisible: false })),
   });
 
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -184,6 +184,16 @@ export default function ItineraryDisplay({
   const [displayEndDate, setDisplayEndDate] = useState(itinerary?.endDate ? new Date(itinerary.endDate) : null);
   const [displayBudget, setDisplayBudget] = useState(Number(soulProfile?.practical?.budget) || 0);
   const [displayCompanions, setDisplayCompanions] = useState(soulProfile?.practical?.companions || 'solo');
+  const [showQr, setShowQr] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const practical = soulProfile && soulProfile.practical ? soulProfile.practical : {};
+  const [editForm, setEditForm] = useState({
+    startDate: practical.startDate || '',
+    endDate: practical.endDate || '',
+    budget: Number(String(practical.budget).replace(/[^\d.]/g, '')) || 0,
+    companions: practical.companions || 'solo',
+    destination: practical.destination || '',
+  });
 
   // Add at the top of the component (inside ItineraryDisplay)
   const companionOptions: { value: string; label: string; icon: React.ReactNode }[] = [
@@ -484,6 +494,36 @@ export default function ItineraryDisplay({
     )
   }
 
+  const p = soulProfile?.practical;
+  console.log('practical for check:', p);
+  if (
+    !p ||
+    typeof p.destination !== 'string' || !p.destination.trim() ||
+    typeof p.startDate !== 'string' || !p.startDate.trim() ||
+    typeof p.endDate !== 'string' || !p.endDate.trim() ||
+    (typeof p.budget !== 'number' && typeof p.budget !== 'string') || p.budget === '' || p.budget === null || p.budget === undefined ||
+    typeof p.companions !== 'string' || !p.companions.trim()
+  ) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-orange-50 to-yellow-100 p-4">
+        <Card className="w-full max-w-md border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-red-600">Missing Required Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">Please complete the quiz before generating your itinerary.</p>
+            {onBack && (
+              <Button variant="outline" onClick={onBack}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Quiz
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (!itinerary) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-zinc-100 flex items-center justify-center p-4">
@@ -512,9 +552,86 @@ export default function ItineraryDisplay({
         onClose={hideToast}
       />
 
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md flex flex-col items-center relative">
+            <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700" onClick={() => setShowEditModal(false)} title="Close">
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-bold mb-4 text-purple-700">Edit Journey Details</h2>
+            <form className="w-full space-y-4" onSubmit={async (e) => {
+              e.preventDefault();
+              setShowEditModal(false);
+              // 重新生成 itinerary
+              setLoading(true);
+              setError(null);
+              try {
+                const response = await fetch("/api/generate-itinerary", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    soulProfile: {
+                      ...soulProfile,
+                      practical: {
+                        ...soulProfile.practical,
+                        ...editForm,
+                        budget: Number(editForm.budget),
+                      },
+                    },
+                  }),
+                });
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setItinerary(data);
+                // 同步 practical 字段
+                soulProfile.practical = { ...soulProfile.practical, ...editForm, budget: Number(editForm.budget) };
+              } catch (e: any) {
+                setError(e.message || "An unknown error occurred.");
+              } finally {
+                setLoading(false);
+              }
+            }}>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-gray-700">Start Date</label>
+                <input type="date" className="border rounded px-3 py-2" value={editForm.startDate} onChange={e => setEditForm(f => ({ ...f, startDate: e.target.value }))} required />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-gray-700">End Date</label>
+                <input type="date" className="border rounded px-3 py-2" value={editForm.endDate} onChange={e => setEditForm(f => ({ ...f, endDate: e.target.value }))} required />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-gray-700">Budget</label>
+                <input type="number" min="0" className="border rounded px-3 py-2" value={editForm.budget} onChange={e => setEditForm(f => ({ ...f, budget: Number(e.target.value) }))} required />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-gray-700">Companions</label>
+                <select className="border rounded px-3 py-2" value={editForm.companions} onChange={e => setEditForm(f => ({ ...f, companions: e.target.value }))} required>
+                  <option value="solo">Solo Journey</option>
+                  <option value="partner">With Partner</option>
+                  <option value="friends">With Friends</option>
+                  <option value="family">With Family</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-semibold text-gray-700">Destination</label>
+                <input type="text" className="border rounded px-3 py-2" value={editForm.destination} onChange={e => setEditForm(f => ({ ...f, destination: e.target.value }))} required />
+              </div>
+              <div className="flex flex-row gap-4 mt-6 justify-end">
+                <button type="button" className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 font-semibold" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold">Confirm</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* Header Card */}
-        <Card className="border-0 shadow-lg bg-white/10 backdrop-blur-xl">
+        <Card className="border-0 shadow-2xl bg-gradient-to-br from-purple-800 via-fuchsia-700 to-indigo-900/95 text-white/95 backdrop-blur-xl ring-2 ring-purple-400/30">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -529,61 +646,46 @@ export default function ItineraryDisplay({
                     )}
                   </CardTitle>
                   {itinerary?.soulQuote && (
-                    <div className="text-center italic text-base sm:text-lg text-gray-300 mt-2 mb-2">
+                    <div className="text-center italic text-gray-200 text-base font-medium mt-1">
                       {`"${itinerary.soulQuote}"`}
                     </div>
                   )}
                   <CardDescription className="text-base sm:text-lg flex flex-wrap items-center gap-4 sm:gap-6 mt-2 text-gray-300 relative">
-                    {/* Days (editable) */}
-                    <div className="relative">
-                      <button
-                        ref={daysBtnRef}
-                        className="flex items-center gap-1 hover:text-purple-400 transition font-semibold focus:outline-none"
-                        onClick={handleOpenDates}
-                        title="Edit trip dates"
-                      >
-                        <Calendar className="h-5 w-5" />
-                        {displayStartDate && displayEndDate
-                          ? `${getDisplayedDays()} days (${displayStartDate.toLocaleDateString('en-GB')} - ${displayEndDate.toLocaleDateString('en-GB')})`
-                          : `${getDisplayedDays()} days`}
-                      </button>
+                    {/* Days (not editable) */}
+                    <div className="relative flex items-center gap-1 font-semibold">
+                      <Calendar className="h-5 w-5" />
+                      {(() => {
+                        const start = new Date(soulProfile.practical.startDate)
+                        const end = new Date(soulProfile.practical.endDate)
+                        const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                        return `${diff} days (${start.toLocaleDateString('en-GB')} - ${end.toLocaleDateString('en-GB')})`
+                      })()}
                     </div>
-                    {/* Budget (editable) */}
-                    <div className="relative">
-                      <button
-                        ref={budgetBtnRef}
-                        className="flex items-center gap-1 hover:text-purple-400 transition font-semibold focus:outline-none"
-                        onClick={handleOpenBudget}
-                        title="Edit budget"
-                      >
-                        $ {displayBudget}
-                      </button>
+                    {/* Budget (not editable) */}
+                    <div className="relative flex items-center font-semibold">
+                      ${parseFloat(String(practical.budget).replace(/[^\d.]/g, ''))}
                     </div>
-                    {/* Companions (editable) */}
-                    <div className="relative">
-                      <button
-                        ref={companionsBtnRef}
-                        className="flex items-center gap-1 hover:text-purple-400 transition font-semibold focus:outline-none"
-                        onClick={handleOpenCompanions}
-                        title="Edit companions"
-                      >
-                        <Users className="h-5 w-5" />
-                        {formatCompanions(displayCompanions)}
-                      </button>
+                    {/* Companions (not editable) */}
+                    <div className="relative flex items-center gap-1 font-semibold">
+                      <Users className="h-5 w-5" />
+                      {formatCompanions(soulProfile.practical.companions)}
+                    </div>
+                    {/* Destination (not editable) */}
+                    <div className="relative flex items-center gap-1 font-semibold">
+                      <MapPin className="h-5 w-5" />
+                      {soulProfile.practical.destination}
                     </div>
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-white shadow transition-all bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed ${isRegenerating ? 'opacity-70 cursor-wait' : ''}`}
-                  onClick={handleRegenerateItinerary}
-                  disabled={!practicalDirty || isRegenerating}
-                  title="Regenerate Itinerary"
+                {/* Edit 按钮 */}
+                <Button
+                  onClick={() => setShowEditModal(true)}
+                  className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl px-5 py-2 shadow-lg hover:from-purple-700 hover:to-fuchsia-700 transition-all flex items-center gap-2 text-base"
                 >
-                  <RefreshCw className={`w-5 h-5 ${isRegenerating ? 'animate-spin' : ''}`} />
-                  {isRegenerating ? 'Regenerating...' : 'Regenerate Itinerary'}
-                </button>
+                  Edit
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -858,15 +960,15 @@ export default function ItineraryDisplay({
             <h3 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-purple-600 via-fuchsia-500 to-indigo-600 bg-clip-text text-transparent mb-6 text-center">
               Continue Your Adventure
             </h3>
-            <div className="flex flex-col md:flex-row items-stretch md:gap-20 gap-8 w-full max-w-5xl mx-auto">
-              {/* 左侧：分享/二维码 */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-start gap-8">
+              {/* 左侧：主内容区 */}
               <div className="flex-1 flex flex-col items-center justify-center">
-                {/* Action Buttons 居中一行 */}
-                <div className="flex flex-row justify-center gap-4 mb-8">
+                {/* Action Buttons 居中一行，宽度一致，大屏一行，小屏自动换行 */}
+                <div className="flex flex-wrap justify-center gap-4 mb-8">
                   {onCreateNew && (
                     <Button
+                      className="min-w-[160px] bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl px-6 py-3 shadow-lg hover:from-purple-700 hover:to-fuchsia-700 transition-all flex items-center gap-2 text-base"
                       onClick={onCreateNew}
-                      className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl px-6 py-3 shadow-lg hover:from-purple-700 hover:to-fuchsia-700 transition-all flex items-center gap-2 text-base"
                     >
                       <Plus className="h-5 w-5" />
                       Create New Journey
@@ -874,17 +976,32 @@ export default function ItineraryDisplay({
                   )}
                   {onBack && (
                     <Button
+                      className="min-w-[160px] bg-white border border-gray-300 text-gray-800 font-bold rounded-xl px-6 py-3 shadow hover:bg-gray-100 transition-all flex items-center gap-2 text-base"
                       onClick={onBack}
                       variant="outline"
-                      className="border-2 border-purple-500 text-purple-700 font-bold rounded-xl px-6 py-3 bg-white hover:bg-purple-50 hover:border-fuchsia-500 hover:text-fuchsia-700 transition-all flex items-center gap-2 text-base"
                     >
                       <ArrowLeft className="h-5 w-5" />
                       {existingItinerary ? "Back to My Journeys" : "Back to Quiz"}
                     </Button>
                   )}
+                  <Button
+                    className="min-w-[160px] bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl px-6 py-3 shadow-lg hover:from-indigo-700 hover:to-purple-700 transition-all flex items-center gap-2 text-base"
+                    onClick={handleSaveJourney}
+                    disabled={isSaving}
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    {isSaving ? 'Saving...' : 'Save Journey'}
+                  </Button>
+                  <Button
+                    className="min-w-[160px] bg-gradient-to-r from-fuchsia-500 to-purple-700 text-white font-bold rounded-xl px-6 py-3 shadow-lg hover:from-fuchsia-600 hover:to-purple-800 transition-all flex items-center gap-2 text-base"
+                    onClick={() => setShowQr(true)}
+                  >
+                    <Share2 className="h-5 w-5" />
+                    Show QR Code
+                  </Button>
                 </div>
                 {/* 社交icon单独一行居中，增加与按钮的间距 */}
-                <div className="flex flex-row justify-center gap-10 mb-8">
+                <div className="flex flex-row justify-center gap-10 mb-8 flex-wrap">
                   <div className="flex flex-col items-center">
                     <button onClick={() => window.open(`https://www.instagram.com/?url=${encodeURIComponent(window.location.href)}`, '_blank')} title="Share to Instagram" className="focus:outline-none">
                       <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -931,38 +1048,33 @@ export default function ItineraryDisplay({
                   </div>
                 </div>
                 {/* 二维码单独一行居中 */}
-                {existingItinerary && (
+                {showQr && (
                   <div className="flex flex-col items-center mt-8">
-                    <QRCodeSVG value={window.location.href} size={96} bgColor="#fff" fgColor="#4f46e5" />
+                    <QRCodeSVG value={window.location.href} size={120} bgColor="#fff" fgColor="#7c3aed" />
                     <div className="text-xs text-gray-400 mt-2">Scan to view this journey</div>
                   </div>
                 )}
               </div>
-              {/* 中间分隔线，仅大屏显示 */}
-              <div className="hidden md:flex w-px bg-gray-200 mx-2 rounded-full" style={{ minHeight: 220 }} />
-              {/* 右侧：实用功能区 */}
-              <div className="flex-1 flex flex-col items-center justify-center bg-white/80 rounded-2xl shadow-lg p-6 min-w-[260px] max-w-xs mx-auto">
-                {/* 快捷操作按钮竖排 */}
-                <div className="flex flex-col gap-3 mb-6 w-full">
-                  <Button variant="outline" className="flex items-center gap-2 w-full justify-start" onClick={() => window.print()}><Download className="h-4 w-4" />Download PDF</Button>
-                  <Button variant="outline" className="flex items-center gap-2 w-full justify-start"><Calendar className="h-4 w-4" />Export Calendar</Button>
-                  <Button variant="outline" className="flex items-center gap-2 w-full justify-start" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
+              {/* 右侧：实用功能区，按钮更紧凑，圆角加大，字体 text-base */}
+              <div className="w-full max-w-xs mx-auto lg:mx-0 lg:w-80 bg-white/80 rounded-2xl shadow-lg p-6 flex flex-col gap-6">
+                <div className="flex flex-col gap-2 mb-2 w-full">
+                  <Button variant="outline" className="rounded-xl py-2 text-base flex items-center gap-2 w-full justify-start" onClick={() => window.print()}><Download className="h-4 w-4" />Download PDF</Button>
+                  <Button variant="outline" className="rounded-xl py-2 text-base flex items-center gap-2 w-full justify-start"><Calendar className="h-4 w-4" />Export Calendar</Button>
+                  <Button variant="outline" className="rounded-xl py-2 text-base flex items-center gap-2 w-full justify-start" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
                 </div>
                 {/* 旅程进度/成就 */}
-                <div className="mb-6 w-full">
+                <div className="mb-2 w-full">
                   <h4 className="text-base font-bold mb-2 text-purple-700">Progress</h4>
                   <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                     <div className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-2 rounded-full" style={{ width: `${Math.round(((completedItems.size || 0) / (itinerary?.dailyItinerary?.reduce((t: number, d: any) => t + (d.activities?.length || 0) + (d.restaurants?.length || 0), 0) || 1)) * 100)}%` }}></div>
                   </div>
                   <div className="text-xs text-gray-600">{completedItems.size} / {itinerary?.dailyItinerary?.reduce((t: number, d: any) => t + (d.activities?.length || 0) + (d.restaurants?.length || 0), 0) || 0} activities completed</div>
                 </div>
-                {/* AI推荐/今日亮点 */}
+                {/* AI Suggestion */}
                 <div className="w-full">
-                  <h4 className="text-base font-bold mb-2 text-purple-700">AI Suggestion</h4>
-                  <div className="text-sm text-purple-700 bg-purple-50 rounded-lg p-3">
-                    {itinerary?.dailyItinerary?.[0]?.activities?.[0]?.name
-                      ? `Don't miss: ${itinerary.dailyItinerary[0].activities[0].name}`
-                      : 'Enjoy your journey!'}
+                  <h4 className="text-base font-bold mb-2 text-fuchsia-700">AI Suggestion</h4>
+                  <div className="bg-fuchsia-50 text-fuchsia-800 rounded-lg p-3 text-sm font-medium shadow-sm">
+                    Don't miss: {itinerary?.dailyItinerary?.[0]?.activities?.[0]?.name || 'Morning Stroll in Tiergarten'}
                   </div>
                 </div>
               </div>
@@ -1096,6 +1208,20 @@ export default function ItineraryDisplay({
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
             <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayCompanions(tempCompanions); setOpenPopover(null); setLastSaved(ls => ({ ...ls, companions: tempCompanions })); setPracticalDirty(true); }}>Save</button>
+          </div>
+        </div>
+      )}
+
+      {/* 新增：二维码弹窗 */}
+      {showQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-xs flex flex-col items-center relative">
+            <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700" onClick={() => setShowQr(false)} title="Close">
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-bold mb-4 text-purple-700">Journey QR Code</h2>
+            <QRCodeSVG value={window.location.href} size={180} bgColor="#fff" fgColor="#7c3aed" />
+            <div className="text-xs text-gray-500 mt-2">Scan to view this journey</div>
           </div>
         </div>
       )}

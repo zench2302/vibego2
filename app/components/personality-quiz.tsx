@@ -71,6 +71,17 @@ const questions = [
   },
 ]
 
+const archetypeOptions = [
+  { key: "contemplative", emoji: "🧘", title: "The Contemplative", desc: "Calm and enjoys solitude" },
+  { key: "spark", emoji: "🎇", title: "The Spark", desc: "Energetic and loves socializing" },
+  { key: "seeker", emoji: "🧠", title: "The Seeker", desc: "Curious and loves exploring" },
+  { key: "creator", emoji: "🎨", title: "The Creator", desc: "Creative and loves making things" },
+  { key: "adventurer", emoji: "🌍", title: "The Adventurer", desc: "Bold and loves new experiences" },
+  { key: "nurturer", emoji: "🤗", title: "The Nurturer", desc: "Caring and enjoys helping others" },
+  { key: "organizer", emoji: "🗂️", title: "The Organizer", desc: "Practical and likes planning" },
+  { key: "dreamer", emoji: "💭", title: "The Dreamer", desc: "Imaginative and loves to daydream" },
+];
+
 interface PersonalityQuizProps {
   onComplete: (data: any) => void
 }
@@ -183,13 +194,15 @@ export default function PersonalityQuiz({ onComplete }: PersonalityQuizProps) {
   const currentQ = questions[currentQuestion]
   const hasAnswer = answers[currentQ.id]
 
+  const isFirstStep = currentQuestion === 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl border-0 shadow-xl bg-white/90 backdrop-blur-sm">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="h-6 w-6 text-purple-600" />
-            <CardTitle className="text-2xl font-bold text-gray-800">Discover Your Travel Vibe</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-800">Soul Archetype Discovery</CardTitle>
           </div>
           <div className="flex flex-col items-center gap-2 mb-2">
             <div className="flex items-center gap-2">
@@ -214,63 +227,102 @@ export default function PersonalityQuiz({ onComplete }: PersonalityQuizProps) {
                 );
               })}
             </div>
-            <span className="text-sm text-gray-600 font-medium">Question {currentQuestion + 1} / {questions.length}</span>
+            <span className="text-sm text-gray-600 font-medium">Step {currentQuestion + 1} / {questions.length}</span>
           </div>
           <Progress value={progress} className="mt-2" />
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="text-center">
-            <h3 className="text-xl font-semibold mb-6 text-gray-800">{currentQ.question}</h3>
-          </div>
-
-          <RadioGroup value={answers[currentQ.id] || ""} onValueChange={handleAnswer} className="space-y-3">
-            {currentQ.options.map((option) => {
-              const isSelected = answers[currentQ.id] === option.value;
-              return (
-                <div
-                  key={option.value}
-                  className={`flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-pointer
-                    ${isSelected
-                      ? 'border-2 border-purple-500 bg-purple-100/60 shadow-lg scale-105'
-                      : 'border-gray-200 hover:bg-gray-50'}
-                  `}
-                  onClick={() => handleAnswer(option.value)}
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleAnswer(option.value); }}
-                  role="button"
-                  aria-pressed={isSelected}
+          {isFirstStep ? (
+            <>
+              <div className="text-center">
+                <h3 className="text-xl font-semibold mb-2 text-gray-800">Which archetype matches your soul's everyday rhythm?</h3>
+                <p className="text-gray-500 mb-6">Feel into your deepest nature...</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {archetypeOptions.map((option) => {
+                  const isSelected = answers[questions[0].id] === option.key;
+                  return (
+                    <div
+                      key={option.key}
+                      className={`flex flex-col items-start p-4 rounded-xl border transition-all duration-200 cursor-pointer w-full h-full
+                        ${isSelected ? 'border-2 border-purple-500 bg-purple-100/60 shadow-lg scale-105' : 'border-gray-200 hover:bg-gray-50'}
+                      `}
+                      onClick={() => handleAnswer(option.key)}
+                      tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleAnswer(option.key); }}
+                      role="button"
+                      aria-pressed={isSelected}
+                    >
+                      <span className="text-3xl mb-2">{option.emoji}</span>
+                      <span className="font-bold text-lg mb-1">{option.title}</span>
+                      <span className="text-gray-600 text-sm">{option.desc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-end pt-6">
+                <Button
+                  onClick={handleNext}
+                  disabled={!answers[questions[0].id]}
+                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                 >
-                  <RadioGroupItem value={option.value} id={option.value} />
-                  <Label htmlFor={option.value} className="flex items-center gap-3 cursor-pointer flex-1 text-base">
-                    <span className="text-2xl">{option.emoji}</span>
-                    <span>{option.label}</span>
-                  </Label>
-                </div>
-              );
-            })}
-          </RadioGroup>
-
-          <div className="flex justify-between pt-6">
-            <Button
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentQuestion === 0}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Previous
-            </Button>
-
-            <Button
-              onClick={handleNext}
-              disabled={!hasAnswer}
-              className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-            >
-              {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+                  Continue the Ritual <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-center">
+                <h3 className="text-xl font-semibold mb-6 text-gray-800">{currentQ.question}</h3>
+              </div>
+              <RadioGroup value={answers[currentQ.id] || ""} onValueChange={handleAnswer} className="space-y-3">
+                {currentQ.options.map((option) => {
+                  const isSelected = answers[currentQ.id] === option.value;
+                  return (
+                    <div
+                      key={option.value}
+                      className={`flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-pointer
+                        ${isSelected
+                          ? 'border-2 border-purple-500 bg-purple-100/60 shadow-lg scale-105'
+                          : 'border-gray-200 hover:bg-gray-50'}
+                      `}
+                      onClick={() => handleAnswer(option.value)}
+                      tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleAnswer(option.value); }}
+                      role="button"
+                      aria-pressed={isSelected}
+                    >
+                      <RadioGroupItem value={option.value} id={option.value} />
+                      <Label htmlFor={option.value} className="flex items-center gap-3 cursor-pointer flex-1 text-base">
+                        <span className="text-2xl">{option.emoji}</span>
+                        <span>{option.label}</span>
+                      </Label>
+                    </div>
+                  );
+                })}
+              </RadioGroup>
+              <div className="flex justify-between pt-6">
+                <Button
+                  variant="outline"
+                  onClick={handlePrevious}
+                  disabled={currentQuestion === 0}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={!hasAnswer}
+                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                >
+                  {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

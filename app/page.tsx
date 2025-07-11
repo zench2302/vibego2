@@ -58,6 +58,7 @@ export default function MysticalTripOracle() {
   }
 
   const handleOracleComplete = (profile: any) => {
+    console.log('handleOracleComplete called with:', profile);
     setSoulProfile(profile)
     setCurrentState("journey")
   }
