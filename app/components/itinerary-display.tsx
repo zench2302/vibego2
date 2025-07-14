@@ -29,7 +29,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DAY_COLOR_SCHEMES } from "./constants"
 import { useAuth } from "../context/auth-context"
-import { db } from "@/lib/firebase"
+import { getDbClient } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { QRCodeSVG } from 'qrcode.react'
 import type { Itinerary, SoulProfile, Activity, Restaurant, Day } from "@/lib/types"
@@ -247,6 +247,7 @@ export default function ItineraryDisplay({
     }
     setIsSaving(true);
     try {
+      const db = await getDbClient();
       await addDoc(collection(db, "users", user.uid, "journeys"), {
         ...itinerary,
         soulProfile,

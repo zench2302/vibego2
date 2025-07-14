@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/auth-context';
-import { db } from '@/lib/firebase';
+import { getDbClient } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,6 +55,7 @@ export default function JourneyView() {
     // Save to Firebase
     if (user && journey) {
       try {
+        const db = await getDbClient();
         await updateDoc(doc(db, "users", user.uid, "journeys", journeyId), {
           completedItems: Array.from(newCompletedItems),
           lastUpdated: new Date()
@@ -74,6 +75,7 @@ export default function JourneyView() {
 
     const fetchJourney = async () => {
       try {
+        const db = await getDbClient();
         const journeyDoc = await getDoc(doc(db, "users", user.uid, "journeys", journeyId));
         if (journeyDoc.exists()) {
           const journeyData = { id: journeyDoc.id, ...journeyDoc.data() } as Record<string, unknown>;

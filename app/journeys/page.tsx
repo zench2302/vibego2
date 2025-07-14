@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/auth-context';
-import { db } from '@/lib/firebase';
+import { getDbClient } from '@/lib/firebase';
 import { collection, query, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -304,10 +304,8 @@ export default function MyJourneys() {
 
     const fetchJourneys = async () => {
       try {
-        const q = query(
-          collection(db, "users", user.uid, "journeys"),
-          orderBy("createdAt", "desc")
-        );
+        const db = await getDbClient();
+        const q = query(collection(db, "users", user.uid, "journeys"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const journeysData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setJourneys(journeysData);
@@ -335,6 +333,7 @@ export default function MyJourneys() {
 
     setIsDeleting(true);
     try {
+      const db = await getDbClient();
       await deleteDoc(doc(db, "users", user.uid, "journeys", deleteModal.journeyId));
       
       // Remove from local state
