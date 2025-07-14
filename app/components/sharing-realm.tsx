@@ -91,14 +91,22 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                   <div className="flex items-center gap-4 mt-2 text-sm text-slate-300">
                     <span className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {(journeyBlueprint as any).destination ?? (journeyBlueprint as any).practical?.destination ?? ''}
+                      {(journeyBlueprint as Itinerary).destination ?? journeyBlueprint.soulProfile?.practical?.destination ?? ''}
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {(() => {
-                        const anyJ = journeyBlueprint as any;
-                        const start = anyJ?.startDate ? new Date(anyJ.startDate) : anyJ.practical?.startDate ? new Date(anyJ.practical.startDate) : null;
-                        const end = anyJ?.endDate ? new Date(anyJ.endDate) : anyJ.practical?.endDate ? new Date(anyJ.practical.endDate) : null;
+                        const anyJ = journeyBlueprint as Itinerary;
+                        const start = anyJ?.startDate
+                          ? new Date(anyJ.startDate)
+                          : journeyBlueprint.soulProfile?.practical?.startDate
+                            ? new Date(journeyBlueprint.soulProfile.practical.startDate)
+                            : null;
+                        const end = anyJ?.endDate
+                          ? new Date(anyJ.endDate)
+                          : journeyBlueprint.soulProfile?.practical?.endDate
+                            ? new Date(journeyBlueprint.soulProfile.practical.endDate)
+                            : null;
                         if (start && end) {
                           const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                           return `${diff} days`;
@@ -108,13 +116,13 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      {(soulProfile as any).practical?.companions ?? (journeyBlueprint as any).companions ?? (journeyBlueprint as any).practical?.companions ?? ''}
+                      {(soulProfile as SoulProfile).practical?.companions ?? (journeyBlueprint as Itinerary).companions ?? journeyBlueprint.soulProfile?.practical?.companions ?? ''}
                     </span>
                   </div>
                 </div>
                 <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
                   <Star className="h-3 w-3 mr-1" />
-                  ${(journeyBlueprint as any).budget ?? (journeyBlueprint as any).practical?.budget ?? 'Budget TBD'}
+                  ${(journeyBlueprint as Itinerary).budget ?? journeyBlueprint.soulProfile?.practical?.budget ?? 'Budget TBD'}
                 </Badge>
               </div>
 
@@ -122,7 +130,7 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
               <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                 <h4 className="font-semibold mb-3 text-slate-200">Day 1 Preview - Day of Wonder</h4>
                 <div className="grid md:grid-cols-2 gap-3">
-                  {journeyBlueprint.dailyItinerary?.[0]?.activities.slice(0, 2).map((activity: Activity, index: number) => (
+                  {(journeyBlueprint.dailyItinerary?.[0]?.activities as Activity[])?.slice(0, 2).map((activity: Activity, index: number) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-white/5 rounded border border-white/10">
                       <span className="text-lg">{activity.emoji}</span>
                       <span className="text-sm text-slate-300">{activity.name}</span>

@@ -209,7 +209,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
         });
     }
     // eslint-disable-next-line
-  }, [user, isGenerating]);
+  }, [user, isGenerating, formData]);
 
   // itinerary 生成完毕后，onComplete
   useEffect(() => {
@@ -219,7 +219,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
       onComplete(finalAnswers);
       setPendingItinerary(null);
     }
-  }, [pendingItinerary, onComplete]);
+  }, [pendingItinerary, onComplete, formData]);
 
   // 1. 优化 handleComplete，确保 loading 状态和参数完整
   const handleComplete = async (): Promise<void> => {
@@ -240,7 +240,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
       const data = await res.json();
       setIsGenerating(false);
       // 强制同步 practical 字段到顶层
-      const practical = (finalAnswers.practical as any) || {};
+      const practical = (finalAnswers.practical as Partial<FormData>) || {};
       const merged = {
         ...data,
         ...finalAnswers,

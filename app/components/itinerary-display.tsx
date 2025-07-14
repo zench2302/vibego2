@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import JourneyMapView from "./journey-map-view"
 import {
   Star,
@@ -178,10 +177,6 @@ export default function ItineraryDisplay({
   );
   const [tempBudget, setTempBudget] = useState(Number(soulProfile?.practical?.budget) || 0);
   const [tempCompanions, setTempCompanions] = useState(soulProfile?.practical?.companions || 'solo');
-  const [displayStartDate, setDisplayStartDate] = useState(tempStartDate);
-  const [displayEndDate, setDisplayEndDate] = useState(tempEndDate);
-  const [displayBudget, setDisplayBudget] = useState(tempBudget);
-  const [displayCompanions, setDisplayCompanions] = useState(tempCompanions);
   const [showQr, setShowQr] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   // 删除 practical 变量
@@ -830,7 +825,7 @@ export default function ItineraryDisplay({
                 </div>
                 <JourneyMapView itinerary={{
                   ...itinerary,
-                  destination: itinerary.destination || (itinerary as any).practical?.destination || '',
+                  destination: itinerary.destination || itinerary.soulProfile?.practical?.destination || '',
                 }} completedItems={completedItems} />
               </CardContent>
             </Card>
@@ -1040,7 +1035,7 @@ export default function ItineraryDisplay({
           </div>
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
-            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayStartDate(tempStartDate); setDisplayEndDate(tempEndDate); setOpenPopover(null); }}>Save</button>
+            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setOpenPopover(null); }}>Save</button>
           </div>
         </div>
       )}
@@ -1061,7 +1056,7 @@ export default function ItineraryDisplay({
           </div>
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
-            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayBudget(tempBudget); setOpenPopover(null); }}>Save</button>
+            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setOpenPopover(null); }}>Save</button>
           </div>
         </div>
       )}
@@ -1090,7 +1085,7 @@ export default function ItineraryDisplay({
           </div>
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
-            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayCompanions(tempCompanions); setOpenPopover(null); }}>Save</button>
+            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setOpenPopover(null); }}>Save</button>
           </div>
         </div>
       )}
