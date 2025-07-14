@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import PreDepartureOracle from "./components/pre-departure-oracle"
 import ItineraryDisplay from "./components/itinerary-display"
 import SharingRealm from "./components/sharing-realm"
-import { useAuth } from "./context/auth-context"
+import { useAuth, AuthProvider } from "./context/auth-context"
 import AuthScreen from "./components/auth-screen"
 import Header from "./components/header"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ const defaultItinerary: Itinerary = {
   dailyItinerary: [],
 };
 
-export default function MysticalTripOracle() {
+function MysticalTripOracle() {
   const { user, loading } = useAuth();
   const prevUserRef = useRef(user);
   
@@ -246,4 +246,12 @@ export default function MysticalTripOracle() {
       </main>
     </div>
   )
+}
+
+export default function Page() {
+  return (
+    <AuthProvider>
+      <MysticalTripOracle />
+    </AuthProvider>
+  );
 }
