@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,8 +13,6 @@ import {
   Heart,
   Navigation,
   Calendar,
-  DollarSign,
-  Users,
   LayoutList,
   MapPin,
   CheckCircle2,
@@ -24,8 +22,7 @@ import {
   X,
   AlertCircle,
   User,
-  User2,
-  RefreshCw,
+  Users,
   Download,
   Printer,
 } from "lucide-react"
@@ -35,14 +32,15 @@ import { useAuth } from "../context/auth-context"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { QRCodeSVG } from 'qrcode.react'
+import type { Itinerary, SoulProfile, Activity, Restaurant, Day } from "@/lib/types"
 
 interface ItineraryDisplayProps {
-  soulProfile: any;
+  soulProfile: SoulProfile;
   completedItems: Set<string>;
   onToggleComplete: (itemId: string) => void;
   onCreateNew?: () => void;
   onBack?: () => void;
-  existingItinerary?: any; // For saved journeys
+  existingItinerary?: Itinerary; // For saved journeys
 }
 
 interface ToastProps {
@@ -152,16 +150,12 @@ export default function ItineraryDisplay({
   onBack,
   existingItinerary 
 }: ItineraryDisplayProps) {
-  const [itinerary, setItinerary] = useState<any>(null)
+  const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // Remove unused state
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>("idle");
-  const [saveError, setSaveError] = useState<string>("");
-  
-  // Toast state
   const [toast, setToast] = useState<ToastProps>({
     message: '',
     type: 'success',
@@ -176,23 +170,29 @@ export default function ItineraryDisplay({
 
   // Add state for editing
   const [openPopover, setOpenPopover] = useState<'dates' | 'budget' | 'companions' | null>(null);
-  const [tempStartDate, setTempStartDate] = useState(itinerary?.startDate ? new Date(itinerary.startDate) : new Date());
-  const [tempEndDate, setTempEndDate] = useState(itinerary?.endDate ? new Date(itinerary.endDate) : new Date());
+  const [tempStartDate, setTempStartDate] = useState(
+    soulProfile?.practical?.startDate ? new Date(soulProfile.practical.startDate) : new Date()
+  );
+  const [tempEndDate, setTempEndDate] = useState(
+    soulProfile?.practical?.endDate ? new Date(soulProfile.practical.endDate) : new Date()
+  );
   const [tempBudget, setTempBudget] = useState(Number(soulProfile?.practical?.budget) || 0);
   const [tempCompanions, setTempCompanions] = useState(soulProfile?.practical?.companions || 'solo');
-  const [displayStartDate, setDisplayStartDate] = useState(itinerary?.startDate ? new Date(itinerary.startDate) : null);
-  const [displayEndDate, setDisplayEndDate] = useState(itinerary?.endDate ? new Date(itinerary.endDate) : null);
-  const [displayBudget, setDisplayBudget] = useState(Number(soulProfile?.practical?.budget) || 0);
-  const [displayCompanions, setDisplayCompanions] = useState(soulProfile?.practical?.companions || 'solo');
+  const [displayStartDate, setDisplayStartDate] = useState(tempStartDate);
+  const [displayEndDate, setDisplayEndDate] = useState(tempEndDate);
+  const [displayBudget, setDisplayBudget] = useState(tempBudget);
+  const [displayCompanions, setDisplayCompanions] = useState(tempCompanions);
   const [showQr, setShowQr] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const practical = soulProfile && soulProfile.practical ? soulProfile.practical : {};
+  // 删除 practical 变量
+  // const practical = soulProfile && soulProfile.practical ? soulProfile.practical : {};
+  // 修改 editForm 初始化
   const [editForm, setEditForm] = useState({
-    startDate: practical.startDate || '',
-    endDate: practical.endDate || '',
-    budget: Number(String(practical.budget).replace(/[^\d.]/g, '')) || 0,
-    companions: practical.companions || 'solo',
-    destination: practical.destination || '',
+    startDate: soulProfile?.practical?.startDate || '',
+    endDate: soulProfile?.practical?.endDate || '',
+    budget: Number(String(soulProfile?.practical?.budget ?? '').replace(/[^\d.]/g, '')) || 0,
+    companions: soulProfile?.practical?.companions || 'solo',
+    destination: soulProfile?.practical?.destination || '',
   });
 
   // Add at the top of the component (inside ItineraryDisplay)
@@ -246,8 +246,6 @@ export default function ItineraryDisplay({
       return;
     }
     setIsSaving(true);
-    setSaveStatus("saving");
-    setSaveError("");
     try {
       await addDoc(collection(db, "users", user.uid, "journeys"), {
         ...itinerary,
@@ -256,12 +254,9 @@ export default function ItineraryDisplay({
         createdAt: serverTimestamp(),
       });
       showToast("Journey saved successfully! ✨", "success");
-      setSaveStatus("success");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving journey: ", error);
-      showToast(`Failed to save journey. ${error.message || "Please try again."}`, "error");
-      setSaveStatus("error");
-      setSaveError(error.message || "Unknown error");
+      showToast(`Failed to save journey. ${error instanceof Error ? error.message : "Please try again."}`, "error");
     } finally {
       setIsSaving(false);
     }
@@ -277,35 +272,6 @@ export default function ItineraryDisplay({
       setFeedbackText('');
       setFeedbackEmail('');
     }, 2000);
-  };
-
-  const daysBtnRef = useRef<HTMLButtonElement>(null);
-  const budgetBtnRef = useRef<HTMLButtonElement>(null);
-  const companionsBtnRef = useRef<HTMLButtonElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
-
-  const handleOpenDates = () => {
-    if (daysBtnRef.current) {
-      const rect = daysBtnRef.current.getBoundingClientRect();
-      setPopoverPos({ left: rect.left, top: rect.bottom + window.scrollY });
-    }
-    setOpenPopover('dates');
-  };
-
-  const handleOpenBudget = () => {
-    if (budgetBtnRef.current) {
-      const rect = budgetBtnRef.current.getBoundingClientRect();
-      setPopoverPos({ left: rect.left, top: rect.bottom + window.scrollY });
-    }
-    setOpenPopover('budget');
-  };
-
-  const handleOpenCompanions = () => {
-    if (companionsBtnRef.current) {
-      const rect = companionsBtnRef.current.getBoundingClientRect();
-      setPopoverPos({ left: rect.left, top: rect.bottom + window.scrollY });
-    }
-    setOpenPopover('companions');
   };
 
   useEffect(() => {
@@ -338,9 +304,9 @@ export default function ItineraryDisplay({
 
         const data = await response.json()
         setItinerary(data)
-      } catch (e: any) {
-        console.error("Failed to generate itinerary:", e)
-        setError(e.message || "An unknown error occurred.")
+      } catch (e: unknown) {
+        console.error("Failed to generate itinerary:", e);
+        setError(e instanceof Error ? e.message : "An unknown error occurred.");
       } finally {
         setLoading(false)
       }
@@ -362,89 +328,6 @@ export default function ItineraryDisplay({
       return () => document.removeEventListener('mousedown', handleClick);
     }
   }, [openPopover]);
-
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [lastSaved, setLastSaved] = useState({
-    startDate: displayStartDate,
-    endDate: displayEndDate,
-    budget: displayBudget,
-    companions: displayCompanions,
-  });
-
-  const hasEdits =
-    displayStartDate?.getTime() !== lastSaved.startDate?.getTime() ||
-    displayEndDate?.getTime() !== lastSaved.endDate?.getTime() ||
-    displayBudget !== lastSaved.budget ||
-    displayCompanions !== lastSaved.companions;
-
-  const [practicalDirty, setPracticalDirty] = useState(false);
-
-  const handleRegenerateItinerary = async () => {
-    setIsRegenerating(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/generate-itinerary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          soulProfile: {
-            ...soulProfile,
-            practical: {
-              ...soulProfile.practical,
-              startDate: displayStartDate,
-              endDate: displayEndDate,
-              budget: displayBudget,
-              companions: displayCompanions,
-            },
-          },
-        }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setItinerary({
-        ...data,
-        startDate: displayStartDate,
-        endDate: displayEndDate,
-        budget: displayBudget,
-        companions: displayCompanions,
-      });
-      setLastSaved({
-        startDate: displayStartDate,
-        endDate: displayEndDate,
-        budget: displayBudget,
-        companions: displayCompanions,
-      });
-      setPracticalDirty(false);
-      showToast("Itinerary regenerated!", "success");
-    } catch (e: any) {
-      setError(e.message || "An unknown error occurred.");
-      showToast(`Failed to regenerate. ${e.message || ''}`, "error");
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
-
-  function getDisplayedDays() {
-    if (displayStartDate && displayEndDate) {
-      // 如果itinerary的日期和当前一致且有dailyItinerary
-      const itineraryStart = itinerary?.startDate ? new Date(itinerary.startDate) : null;
-      const itineraryEnd = itinerary?.endDate ? new Date(itinerary.endDate) : null;
-      if (
-        itinerary?.dailyItinerary?.length &&
-        itineraryStart?.getTime() === displayStartDate.getTime() &&
-        itineraryEnd?.getTime() === displayEndDate.getTime()
-      ) {
-        return itinerary.dailyItinerary.length;
-      }
-      // 否则用日期差
-      const diff = Math.round((displayEndDate.getTime() - displayStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      return diff > 0 ? diff : 1;
-    }
-    return itinerary?.dailyItinerary?.length || 1;
-  }
 
   if (loading) {
     return (
@@ -472,7 +355,7 @@ export default function ItineraryDisplay({
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md border-0 shadow-xl bg-white/90 backdrop-blur-sm text-center">
           <CardHeader>
-            <CardTitle className="text-2xl text-red-600">Oracle's Vision is Clouded</CardTitle>
+            <CardTitle className="text-2xl text-red-600">Oracle&#39;s Vision is Clouded</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 mb-4">There was an error generating your sacred journey.</p>
@@ -511,7 +394,7 @@ export default function ItineraryDisplay({
             <CardTitle className="text-2xl text-red-600">Missing Required Info</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 mb-4">Please complete the quiz before generating your itinerary.</p>
+            <p className="text-gray-700 mb-4">Please complete the quiz before generating your itinerary. Don&#39;t forget to check all required fields.</p>
             {onBack && (
               <Button variant="outline" onClick={onBack}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -589,8 +472,8 @@ export default function ItineraryDisplay({
                 setItinerary(data);
                 // 同步 practical 字段
                 soulProfile.practical = { ...soulProfile.practical, ...editForm, budget: Number(editForm.budget) };
-              } catch (e: any) {
-                setError(e.message || "An unknown error occurred.");
+              } catch (e: unknown) {
+                setError(e instanceof Error ? e.message : "An unknown error occurred.");
               } finally {
                 setLoading(false);
               }
@@ -655,20 +538,20 @@ export default function ItineraryDisplay({
                     <div className="relative flex items-center gap-1 font-semibold">
                       <Calendar className="h-5 w-5" />
                       {(() => {
-                        const start = new Date(soulProfile.practical.startDate)
-                        const end = new Date(soulProfile.practical.endDate)
+                        const start = displayStartDate
+                        const end = displayEndDate
                         const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
                         return `${diff} days (${start.toLocaleDateString('en-GB')} - ${end.toLocaleDateString('en-GB')})`
                       })()}
                     </div>
                     {/* Budget (not editable) */}
                     <div className="relative flex items-center font-semibold">
-                      ${parseFloat(String(practical.budget).replace(/[^\d.]/g, ''))}
+                      ${displayBudget}
                     </div>
                     {/* Companions (not editable) */}
                     <div className="relative flex items-center gap-1 font-semibold">
                       <Users className="h-5 w-5" />
-                      {formatCompanions(soulProfile.practical.companions)}
+                      {formatCompanions(displayCompanions)}
                     </div>
                     {/* Destination (not editable) */}
                     <div className="relative flex items-center gap-1 font-semibold">
@@ -705,7 +588,7 @@ export default function ItineraryDisplay({
           </TabsList>
           
           <TabsContent value="itinerary" className="space-y-4">
-            {itinerary?.dailyItinerary?.map((day: any) => {
+            {itinerary?.dailyItinerary?.map((day: Day) => {
               const colorScheme = DAY_COLOR_SCHEMES[(day.day - 1) % DAY_COLOR_SCHEMES.length];
               return (
                 <Card 
@@ -732,9 +615,9 @@ export default function ItineraryDisplay({
                         <div className="text-right">
                           <div className="text-xs text-white/80">Progress</div>
                           <div className="text-sm font-bold">
-                            {Math.round(((day.activities?.filter((_: any, index: number) => 
+                            {Math.round(((day.activities?.filter((_: Activity, index: number) => 
                               completedItems.has(`item-${day.day}-${index}`)
-                            ).length + day.restaurants?.filter((_: any, index: number) => 
+                            ).length + day.restaurants?.filter((_: Restaurant, index: number) => 
                               completedItems.has(`item-${day.day}-${day.activities?.length + index}`)
                             ).length) / (day.activities?.length + day.restaurants?.length)) * 100)}%
                           </div>
@@ -759,7 +642,7 @@ export default function ItineraryDisplay({
                         <span className="text-lg">Quest Activities</span>
                         <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
                         <span className="text-sm text-gray-500">
-                          {day.activities?.filter((_: any, index: number) => 
+                          {day.activities?.filter((_: Activity, index: number) => 
                             completedItems.has(`item-${day.day}-${index}`)
                           ).length || 0} / {day.activities?.length || 0} completed
                         </span>
@@ -767,7 +650,7 @@ export default function ItineraryDisplay({
                       
                       {/* Grid Layout for Activities */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {day.activities?.map((activity: any, index: number) => {
+                        {day.activities?.map((activity: Activity, index: number) => {
                            const itemId = `item-${day.day}-${index}`;
                            const isCompleted = completedItems.has(itemId);
                             return (
@@ -840,7 +723,7 @@ export default function ItineraryDisplay({
                         <span className="text-lg">Culinary Discoveries</span>
                         <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
                         <span className="text-sm text-gray-500">
-                          {day.restaurants?.filter((_: any, index: number) => 
+                          {day.restaurants?.filter((_: Restaurant, index: number) => 
                             completedItems.has(`item-${day.day}-${day.activities?.length + index}`)
                           ).length || 0} / {day.restaurants?.length || 0} completed
                         </span>
@@ -848,7 +731,7 @@ export default function ItineraryDisplay({
                       
                       {/* Grid Layout for Restaurants */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {day.restaurants?.map((restaurant: any, index: number) => {
+                        {day.restaurants?.map((restaurant: Restaurant, index: number) => {
                            const activityCount = day.activities?.length || 0;
                            const itemId = `item-${day.day}-${activityCount + index}`;
                            const isCompleted = completedItems.has(itemId);
@@ -937,7 +820,7 @@ export default function ItineraryDisplay({
                     <Navigation className="w-4 h-4" />
                     <span className="font-medium">
                       {(() => {
-                        const totalItems = itinerary?.dailyItinerary?.reduce((total: number, day: any) => 
+                        const totalItems = itinerary?.dailyItinerary?.reduce((total: number, day: Day) => 
                           total + (day.activities?.length || 0) + (day.restaurants?.length || 0), 0
                         ) || 0;
                         const remainingItems = totalItems - completedItems.size;
@@ -1066,15 +949,15 @@ export default function ItineraryDisplay({
                 <div className="mb-2 w-full">
                   <h4 className="text-base font-bold mb-2 text-purple-700">Progress</h4>
                   <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    <div className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-2 rounded-full" style={{ width: `${Math.round(((completedItems.size || 0) / (itinerary?.dailyItinerary?.reduce((t: number, d: any) => t + (d.activities?.length || 0) + (d.restaurants?.length || 0), 0) || 1)) * 100)}%` }}></div>
+                    <div className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-2 rounded-full" style={{ width: `${Math.round(((completedItems.size || 0) / (itinerary?.dailyItinerary?.reduce((t: number, d: Day) => t + (d.activities?.length || 0) + (d.restaurants?.length || 0), 0) || 1)) * 100)}%` }}></div>
                   </div>
-                  <div className="text-xs text-gray-600">{completedItems.size} / {itinerary?.dailyItinerary?.reduce((t: number, d: any) => t + (d.activities?.length || 0) + (d.restaurants?.length || 0), 0) || 0} activities completed</div>
+                  <div className="text-xs text-gray-600">{completedItems.size} / {itinerary?.dailyItinerary?.reduce((t: number, d: Day) => t + (d.activities?.length || 0) + (d.restaurants?.length || 0), 0) || 0} activities completed</div>
                 </div>
                 {/* AI Suggestion */}
                 <div className="w-full">
                   <h4 className="text-base font-bold mb-2 text-fuchsia-700">AI Suggestion</h4>
                   <div className="bg-fuchsia-50 text-fuchsia-800 rounded-lg p-3 text-sm font-medium shadow-sm">
-                    Don't miss: {itinerary?.dailyItinerary?.[0]?.activities?.[0]?.name || 'Morning Stroll in Tiergarten'}
+                    Don&#39;t miss: {itinerary?.dailyItinerary?.[0]?.activities?.[0]?.name || 'Morning Stroll in Tiergarten'}
                   </div>
                 </div>
               </div>
@@ -1139,9 +1022,9 @@ export default function ItineraryDisplay({
           id="date-popover"
           className="fixed z-[9999] bg-white rounded-xl shadow-xl p-4 w-auto border border-gray-100 flex flex-col items-center"
           style={{
-            left: popoverPos.left === 0 && popoverPos.top === 0 ? '50vw' : popoverPos.left,
-            top: popoverPos.left === 0 && popoverPos.top === 0 ? 120 : popoverPos.top,
-            transform: popoverPos.left === 0 && popoverPos.top === 0 ? 'translateX(-50%)' : undefined
+            left: '50vw',
+            top: 120,
+            transform: 'translateX(-50%)'
           }}
         >
           <h2 className="text-base font-bold mb-2 text-gray-800">Edit Trip Dates</h2>
@@ -1157,7 +1040,7 @@ export default function ItineraryDisplay({
           </div>
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
-            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayStartDate(tempStartDate); setDisplayEndDate(tempEndDate); setOpenPopover(null); setLastSaved(ls => ({ ...ls, startDate: tempStartDate, endDate: tempEndDate })); setPracticalDirty(true); }}>Save</button>
+            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayStartDate(tempStartDate); setDisplayEndDate(tempEndDate); setOpenPopover(null); }}>Save</button>
           </div>
         </div>
       )}
@@ -1166,9 +1049,9 @@ export default function ItineraryDisplay({
           id="budget-popover"
           className="fixed z-[9999] bg-white rounded-xl shadow-xl p-4 w-auto border border-gray-100 flex flex-col items-center"
           style={{
-            left: popoverPos.left === 0 && popoverPos.top === 0 ? '50vw' : popoverPos.left,
-            top: popoverPos.left === 0 && popoverPos.top === 0 ? 120 : popoverPos.top,
-            transform: popoverPos.left === 0 && popoverPos.top === 0 ? 'translateX(-50%)' : undefined
+            left: '50vw',
+            top: 120,
+            transform: 'translateX(-50%)'
           }}
         >
           <h2 className="text-base font-bold mb-2 text-gray-800">Edit Budget</h2>
@@ -1178,7 +1061,7 @@ export default function ItineraryDisplay({
           </div>
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
-            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayBudget(tempBudget); setOpenPopover(null); setLastSaved(ls => ({ ...ls, budget: tempBudget })); setPracticalDirty(true); }}>Save</button>
+            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayBudget(tempBudget); setOpenPopover(null); }}>Save</button>
           </div>
         </div>
       )}
@@ -1187,9 +1070,9 @@ export default function ItineraryDisplay({
           id="companions-popover"
           className="fixed z-[9999] bg-white rounded-xl shadow-xl p-4 w-auto border border-gray-100 flex flex-col items-center"
           style={{
-            left: popoverPos.left === 0 && popoverPos.top === 0 ? '50vw' : popoverPos.left,
-            top: popoverPos.left === 0 && popoverPos.top === 0 ? 120 : popoverPos.top,
-            transform: popoverPos.left === 0 && popoverPos.top === 0 ? 'translateX(-50%)' : undefined
+            left: '50vw',
+            top: 120,
+            transform: 'translateX(-50%)'
           }}
         >
           <h2 className="text-base font-bold mb-2 text-gray-800">Select Companions</h2>
@@ -1207,7 +1090,7 @@ export default function ItineraryDisplay({
           </div>
           <div className="flex justify-end gap-2 mt-4 w-full">
             <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => setOpenPopover(null)}>Cancel</button>
-            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayCompanions(tempCompanions); setOpenPopover(null); setLastSaved(ls => ({ ...ls, companions: tempCompanions })); setPracticalDirty(true); }}>Save</button>
+            <button className="px-3 py-1 rounded bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold" onClick={() => { setDisplayCompanions(tempCompanions); setOpenPopover(null); }}>Save</button>
           </div>
         </div>
       )}

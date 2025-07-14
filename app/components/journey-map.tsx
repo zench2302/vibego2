@@ -22,11 +22,12 @@ import {
   Check,
 } from "lucide-react"
 import { oracleSteps } from "@/lib/oracle-data"
+import type { Itinerary, SoulProfile, Day, Activity, Restaurant } from "@/lib/types"
 
 // We need a small utility to create an API client
 // In a real app, this would be in its own file, e.g., lib/api.ts
 const api = {
-  generateItinerary: async (answers: any) => {
+  generateItinerary: async (answers: SoulProfile) => {
     const response = await fetch('/api/generate-itinerary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -43,12 +44,12 @@ const api = {
 }
 
 interface JourneyMapProps {
-  soulProfile: any // This now contains all the answers from the oracle
-  onComplete: (blueprint: any) => void
+  soulProfile: SoulProfile;
+  onComplete: (blueprint: Itinerary) => void;
 }
 
 export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps) {
-  const [journeyData, setJourneyData] = useState<any>(null)
+  const [journeyData, setJourneyData] = useState<Itinerary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
@@ -64,9 +65,14 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
       try {
         const data = await api.generateItinerary(soulProfile)
         setJourneyData(data.itinerary) // The API returns { itinerary: { ... } }
-      } catch (err: any) {
-        console.error("Failed to generate journey:", err)
-        setError(err.message || "A cosmic disturbance occurred while weaving your journey.")
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          console.error("Failed to generate journey:", err)
+          setError(err.message || "A cosmic disturbance occurred while weaving your journey.")
+        } else {
+          console.error("Failed to generate journey:", err)
+          setError("A cosmic disturbance occurred while weaving your journey.")
+        }
       } finally {
         setLoading(false)
       }
@@ -93,8 +99,13 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
   }
 
   const handleSaveJourney = () => {
+    if (!journeyData) return;
+    
     onComplete({
       ...journeyData,
+      destination: journeyData.destination || 'Unknown Destination',
+      tripTitle: journeyData.tripTitle || 'My Journey',
+      dailyItinerary: journeyData.dailyItinerary || [],
       soulProfile,
       createdAt: new Date().toISOString(),
     })
@@ -102,16 +113,16 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
 
   const getUserPreferencesDescription = () => {
     // We need to find the full archetype object to get the description
-    const archetypeInfo = oracleSteps.find(step => step.id === 'archetype')?.options?.find(o => o.value === soulProfile.archetype);
+    const archetypeInfo = oracleSteps.find(step => step.id === 'archetype')?.options?.find(o => o.value === soulProfile.archetype.name);
     const moodInfo = oracleSteps.find(step => step.id === 'mood')?.options?.find(o => o.value === soulProfile.mood);
 
     return {
       archetype: `${archetypeInfo?.emoji || '✨'} ${archetypeInfo?.label || 'Unknown'}: ${archetypeInfo?.description || ''}`,
       mood: `${moodInfo?.emoji || '🌀'} ${moodInfo?.label || 'Unknown'}: ${moodInfo?.description || ''}`,
-      philosophy: soulProfile.philosophy,
-      intention: soulProfile.intention,
-      destinations: soulProfile.destinations?.join(", ") || "Various experiences",
-    }
+      philosophy: soulProfile.philosophy || 'Unknown',
+      intention: soulProfile.intention || 'Unknown',
+      destinations: Array.isArray(soulProfile.destinations) ? soulProfile.destinations.join(", ") : "Various experiences",
+    } as const
   }
 
   if (loading) {
@@ -125,7 +136,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
             </div>
             <h3 className="text-xl font-semibold mb-2 text-slate-100">Weaving Your Sacred Journey</h3>
             <p className="text-slate-300">The cosmic forces are aligning your perfect itinerary...</p>
-            {soulProfile.archetype && <div className="mt-4 text-sm text-purple-200">✨ Channeling {soulProfile.archetype} energy ✨</div>}
+            {soulProfile.archetype && <div className="mt-4 text-sm text-purple-200">✨ Channeling {soulProfile.archetype.name} energy ✨</div>}
           </CardContent>
         </Card>
       </div>
@@ -174,7 +185,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
               <div className="flex items-center gap-4">
                 <div className="text-6xl">{soulProfile.archetype.emoji}</div>
                 <div>
-                  <CardTitle className="text-3xl font-bold mb-2 text-slate-100">{journeyData.title}</CardTitle>
+                  <CardTitle className="text-3xl font-bold mb-2 text-slate-100">{journeyData.tripTitle}</CardTitle>
                   <div className="flex items-center gap-4 text-slate-300">
                     <span className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
@@ -182,10 +193,10 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {journeyData.duration} days
+                      {journeyData.dailyItinerary?.length || 0} days
                     </span>
                     <span className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />${journeyData.totalBudget}
+                      <DollarSign className="h-4 w-4" />$Budget TBD
                     </span>
                   </div>
                 </div>
@@ -234,7 +245,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                 </div>
                 <div>
                   <h4 className="font-semibold text-purple-200 mb-2">Journey Style</h4>
-                  <p className="text-sm text-slate-300 capitalize">{getUserPreferencesDescription().philosophy}</p>
+                  <p className="text-sm text-slate-300 capitalize">{String(getUserPreferencesDescription().philosophy)}</p>
                 </div>
                 <div>
                   <h4 className="font-semibold text-purple-200 mb-2">Intention</h4>
@@ -242,11 +253,13 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                 </div>
                 <div>
                   <h4 className="font-semibold text-purple-200 mb-2">Interests</h4>
-                  <p className="text-sm text-slate-300">{getUserPreferencesDescription().destinations}</p>
+                  <p className="text-sm text-slate-300">
+                    {Array.isArray(soulProfile.destinations) ? soulProfile.destinations.join(", ") : "Various experiences"}
+                  </p>
                 </div>
                 <div className="pt-4 border-t border-white/10">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-emerald-400 mb-1">${journeyData.totalBudget}</div>
+                    <div className="text-2xl font-bold text-emerald-400 mb-1">$Budget TBD</div>
                     <p className="text-xs text-slate-400">Total Journey Budget</p>
                   </div>
                 </div>
@@ -270,7 +283,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
 
               <TabsContent value="journey" className="space-y-6">
                 {/* Daily Journey */}
-                {journeyData.days.map((day: any) => (
+                {journeyData.dailyItinerary?.map((day: Day) => (
                   <Card
                     key={day.day}
                     className={`border border-white/10 shadow-xl bg-white/5 backdrop-blur-xl transition-all duration-300 ${
@@ -287,12 +300,12 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                             <CardTitle className="text-xl text-slate-100">
                               Day {day.day} - {day.theme}
                             </CardTitle>
-                            <p className="text-slate-300 text-sm">{day.date}</p>
+                            <p className="text-slate-300 text-sm">Day {day.day}</p>
                           </div>
                         </div>
                         <Badge variant="outline" className="border-purple-300 text-purple-200 bg-purple-900/20">
                           <Sparkles className="h-3 w-3 mr-1" />
-                          {day.mysticalNote}
+                          {day.theme}
                         </Badge>
                       </div>
                     </CardHeader>
@@ -306,30 +319,22 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                             Sacred Activities
                           </h4>
                           <div className="grid md:grid-cols-2 gap-4">
-                            {day.activities.map((activity: any, index: number) => (
+                            {day.activities.map((activity: Activity, index: number) => (
                               <div
                                 key={index}
                                 className="p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-sm"
                               >
                                 <div className="flex items-start gap-3">
-                                  <span className="text-2xl">{activity.icon}</span>
+                                  <span className="text-2xl">{activity.emoji}</span>
                                   <div className="flex-1">
                                     <h5 className="font-semibold text-slate-100">{activity.name}</h5>
+                                    <p className="text-sm text-slate-300 mt-2">{activity.description}</p>
                                     <div className="flex items-center gap-4 mt-2 text-sm text-slate-300">
                                       <span className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {activity.duration}
-                                      </span>
-                                      <span className="flex items-center gap-1">
-                                        <DollarSign className="h-3 w-3" />${activity.cost}
+                                        <MapPin className="h-3 w-3" />
+                                        {activity.address}
                                       </span>
                                     </div>
-                                    <Badge
-                                      variant="secondary"
-                                      className="mt-2 text-xs bg-purple-900/30 text-purple-200 border-purple-400/20"
-                                    >
-                                      {activity.type}
-                                    </Badge>
                                     <div className="flex gap-2 mt-3">
                                       <Button
                                         size="sm"
@@ -365,22 +370,21 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                             Nourishment for the Soul
                           </h4>
                           <div className="grid md:grid-cols-2 gap-4">
-                            {day.restaurants.map((restaurant: any, index: number) => (
+                            {day.restaurants.map((restaurant: Restaurant, index: number) => (
                               <div
                                 key={index}
                                 className="p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-sm"
                               >
                                 <div className="flex items-start gap-3">
-                                  <span className="text-2xl">{restaurant.icon}</span>
+                                  <span className="text-2xl">{restaurant.emoji}</span>
                                   <div className="flex-1">
                                     <h5 className="font-semibold text-slate-100">{restaurant.name}</h5>
-                                    <p className="text-sm text-slate-300">{restaurant.type}</p>
+                                    <p className="text-sm text-slate-300">{restaurant.description}</p>
                                     <div className="flex items-center gap-2 mt-2">
-                                      <div className="flex items-center gap-1">
-                                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                        <span className="text-sm text-slate-300">{restaurant.rating}</span>
-                                      </div>
-                                      <span className="text-sm text-slate-300">${restaurant.cost}</span>
+                                      <span className="flex items-center gap-1">
+                                        <MapPin className="h-3 w-3" />
+                                        <span className="text-sm text-slate-300">{restaurant.address}</span>
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -403,7 +407,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-slate-300 text-sm">
-                      Describe any changes you'd like to make to your entire journey. The cosmic forces will adapt your
+                      Describe any changes you&#39;d like to make to your entire journey. The cosmic forces will adapt your
                       plan accordingly.
                     </p>
                     <textarea
@@ -474,9 +478,9 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                       </svg>
 
                       {/* Location Pins with Day Numbers */}
-                      {journeyData.mapLocations.map((location: any, index: number) => (
+                      {journeyData.dailyItinerary?.map((day: Day, index: number) => (
                         <div
-                          key={location.id}
+                          key={day.day}
                           className="absolute group cursor-pointer"
                           style={{
                             left: `${15 + index * 12}%`,
@@ -484,10 +488,10 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                           }}
                         >
                           <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg hover:scale-110 transition-transform border-2 border-white/30">
-                            {location.day}
+                            {day.day}
                           </div>
                           <div className="absolute top-12 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-white/20">
-                            {location.name}
+                            {day.theme}
                           </div>
                         </div>
                       ))}
@@ -495,7 +499,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
                       {/* Destination Label */}
                       <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
                         <h3 className="text-white font-semibold">{journeyData.destination}</h3>
-                        <p className="text-slate-300 text-xs">{journeyData.duration} Day Journey</p>
+                        <p className="text-slate-300 text-xs">{journeyData.dailyItinerary?.length || 0} Day Journey</p>
                       </div>
                     </div>
                   </CardContent>
@@ -512,7 +516,7 @@ export default function JourneyMap({ soulProfile, onComplete }: JourneyMapProps)
               <Sparkles className="h-12 w-12 text-amber-400 mx-auto mb-4 animate-pulse" />
               <h3 className="text-2xl font-semibold mb-2 text-slate-100">Your Sacred Journey Awaits</h3>
               <p className="text-slate-300 max-w-2xl mx-auto">
-                The universe has woven a tapestry of experiences perfectly aligned with your soul's calling. Are you
+                The universe has woven a tapestry of experiences perfectly aligned with your soul&#39;s calling. Are you
                 ready to embark on this transformative adventure?
               </p>
             </div>

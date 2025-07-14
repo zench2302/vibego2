@@ -10,8 +10,28 @@ import Header from "./components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sparkles, Compass, Star, Map, ArrowRight, ArrowLeft, Plus } from "lucide-react"
+import type { Itinerary, SoulProfile } from "@/lib/types"
 
 type AppState = "intro" | "auth" | "oracle" | "journey" | "sharing"
+
+const defaultSoulProfile: SoulProfile = {
+  archetype: { name: 'Traveler', emoji: '🧭' },
+  mood: 'curious',
+  intention: 'discover',
+  practical: {
+    budget: 'Unknown',
+    companions: 'Solo',
+    destination: 'Unknown',
+    startDate: '',
+    endDate: ''
+  }
+};
+
+const defaultItinerary: Itinerary = {
+  destination: 'Unknown',
+  tripTitle: 'Untitled Journey',
+  dailyItinerary: [],
+};
 
 export default function MysticalTripOracle() {
   const { user, loading } = useAuth();
@@ -19,8 +39,8 @@ export default function MysticalTripOracle() {
   
   // App-specific state
   const [currentState, setCurrentState] = useState<AppState>("intro")
-  const [soulProfile, setSoulProfile] = useState(null)
-  const [journeyBlueprint, setJourneyBlueprint] = useState(null)
+  const [soulProfile, setSoulProfile] = useState<SoulProfile | null>(null)
+  const [journeyBlueprint, setJourneyBlueprint] = useState<Itinerary | null>(null)
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set())
 
   // Auto-transition to oracle when user logs in
@@ -57,16 +77,12 @@ export default function MysticalTripOracle() {
     })
   }
 
-  const handleOracleComplete = (profile: any) => {
+  const handleOracleComplete = (profile: SoulProfile) => {
     console.log('handleOracleComplete called with:', profile);
     setSoulProfile(profile)
     setCurrentState("journey")
   }
 
-  const handleJourneyComplete = (blueprint: any) => {
-    setJourneyBlueprint(blueprint)
-    setCurrentState("sharing")
-  }
 
   const handleCreateNewJourney = () => {
     setSoulProfile(null)
@@ -198,7 +214,8 @@ export default function MysticalTripOracle() {
 
           <div className="container mx-auto max-w-6xl p-4">
             <ItineraryDisplay 
-              soulProfile={soulProfile} 
+              soulProfile={soulProfile || defaultSoulProfile} 
+              existingItinerary={journeyBlueprint || defaultItinerary}
               completedItems={completedItems} 
               onToggleComplete={handleToggleComplete}
             />
@@ -210,8 +227,8 @@ export default function MysticalTripOracle() {
     if (currentState === "sharing") {
       return (
         <SharingRealm 
-          journeyBlueprint={journeyBlueprint} 
-          soulProfile={soulProfile}
+          journeyBlueprint={journeyBlueprint || defaultItinerary} 
+          soulProfile={soulProfile || defaultSoulProfile}
           onCreateNew={handleCreateNewJourney}
         />
       )

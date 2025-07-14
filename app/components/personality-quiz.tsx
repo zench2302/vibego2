@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react"
+import type { PersonalityProfile } from "@/lib/types";
 
 const questions = [
   {
@@ -83,7 +84,7 @@ const archetypeOptions = [
 ];
 
 interface PersonalityQuizProps {
-  onComplete: (data: any) => void
+  onComplete: (data: PersonalityProfile) => void
 }
 
 export default function PersonalityQuiz({ onComplete }: PersonalityQuizProps) {
@@ -236,7 +237,7 @@ export default function PersonalityQuiz({ onComplete }: PersonalityQuizProps) {
           {isFirstStep ? (
             <>
               <div className="text-center">
-                <h3 className="text-xl font-semibold mb-2 text-gray-800">Which archetype matches your soul's everyday rhythm?</h3>
+                <h3 className="text-xl font-semibold mb-2 text-gray-800">Which archetype matches your soul&#39;s everyday rhythm?</h3>
                 <p className="text-gray-500 mb-6">Feel into your deepest nature...</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

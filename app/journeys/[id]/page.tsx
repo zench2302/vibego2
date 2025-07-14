@@ -10,10 +10,30 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus } from 'lucide-react';
 import Link from 'next/link';
 import ItineraryDisplay from '../../components/itinerary-display';
+import type { SoulProfile, Itinerary } from '@/lib/types';
+
+const defaultSoulProfile: SoulProfile = {
+  archetype: { name: 'Traveler', emoji: '🧭' },
+  mood: 'curious',
+  intention: 'discover',
+  practical: {
+    budget: 'Unknown',
+    companions: 'Solo',
+    destination: 'Unknown',
+    startDate: '',
+    endDate: ''
+  }
+};
+
+const defaultItinerary: Itinerary = {
+  destination: 'Unknown',
+  tripTitle: 'Untitled Journey',
+  dailyItinerary: [],
+};
 
 export default function JourneyView() {
   const { user, loading: authLoading } = useAuth();
-  const [journey, setJourney] = useState<any>(null);
+  const [journey, setJourney] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
@@ -56,12 +76,12 @@ export default function JourneyView() {
       try {
         const journeyDoc = await getDoc(doc(db, "users", user.uid, "journeys", journeyId));
         if (journeyDoc.exists()) {
-          const journeyData = { id: journeyDoc.id, ...journeyDoc.data() } as any;
+          const journeyData = { id: journeyDoc.id, ...journeyDoc.data() } as Record<string, unknown>;
           setJourney(journeyData);
           
           // Load completion state
-          if (journeyData.completedItems) {
-            setCompletedItems(new Set(journeyData.completedItems));
+          if (journeyData.completedItems && Array.isArray(journeyData.completedItems)) {
+            setCompletedItems(new Set(journeyData.completedItems as string[]));
           }
         } else {
           setError("Journey not found");
@@ -155,18 +175,23 @@ export default function JourneyView() {
 
       <div className="container mx-auto max-w-6xl p-4">
         <ItineraryDisplay
-          soulProfile={journey.soulProfile || {
-            archetype: { name: 'Traveler', emoji: '🧭' },
-            practical: {
-              budget: 'Unknown',
-              companions: 'Solo'
-            }
-          }}
+          soulProfile={
+            (typeof journey === 'object' && journey !== null && 'soulProfile' in journey && journey.soulProfile)
+              ? (journey as { soulProfile: SoulProfile }).soulProfile
+              : defaultSoulProfile
+          }
           completedItems={completedItems}
           onToggleComplete={handleToggleComplete}
           onCreateNew={handleCreateNew}
           onBack={handleBack}
-          existingItinerary={journey} // Pass the saved journey data directly
+          existingItinerary={
+            (typeof journey === 'object' && journey !== null &&
+              'destination' in journey &&
+              'tripTitle' in journey &&
+              'dailyItinerary' in journey)
+              ? (journey as Itinerary)
+              : defaultItinerary
+          }
         />
       </div>
     </div>

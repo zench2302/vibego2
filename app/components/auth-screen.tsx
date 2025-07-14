@@ -32,8 +32,8 @@ export default function AuthScreen({ onBack, onAuthStart }: AuthScreenProps) {
         await signInWithEmailAndPassword(auth, email, password);
       }
       // On success, the main page will automatically rerender.
-    } catch (error: any) {
-      setError(error.message.replace('Firebase: ', ''));
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message.replace('Firebase: ', '') : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }

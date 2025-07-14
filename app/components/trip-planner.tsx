@@ -13,8 +13,21 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, MapPin, Users, DollarSign, Sparkles } from "lucide-react"
 
 interface TripPlannerProps {
-  personalityData: any
-  onComplete: (data: any) => void
+  personalityData: {
+    type: string;
+    emoji: string;
+    description: string;
+  };
+  onComplete: (data: {
+    destination: string;
+    startDate: string;
+    endDate: string;
+    budget: string;
+    groupSize: string;
+    interests: string[];
+    specialRequests: string;
+    personalityType: string;
+  }) => void;
 }
 
 export default function TripPlanner({ personalityData, onComplete }: TripPlannerProps) {
@@ -86,9 +99,7 @@ export default function TripPlanner({ personalityData, onComplete }: TripPlanner
               <MapPin className="h-6 w-6 text-purple-600" />
               Plan Your Perfect Trip
             </CardTitle>
-            <CardDescription className="text-lg">
-              Tell us about your dream destination and we'll create a personalized itinerary
-            </CardDescription>
+            <CardDescription className="text-lg">Tell us about your dream destination and we&#39;ll create a personalized itinerary</CardDescription>
           </CardHeader>
 
           <CardContent>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { User } from 'firebase/auth';
-import { LogOut, BookOpen, Plus, Home } from 'lucide-react';
+import { LogOut, BookOpen, Plus } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 interface HeaderProps {

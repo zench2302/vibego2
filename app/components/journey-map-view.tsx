@@ -3,9 +3,10 @@
 import { useEffect, useState, memo } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap, InfoWindow } from '@vis.gl/react-google-maps';
 import { DAY_COLOR_SCHEMES } from './constants';
+import type { Itinerary, Day, Activity, Restaurant } from "@/lib/types"
 
 interface JourneyMapViewProps {
-  itinerary: any;
+  itinerary: Itinerary;
   completedItems: Set<string>;
 }
 
@@ -73,9 +74,9 @@ export default function JourneyMapView({ itinerary, completedItems }: JourneyMap
       }
 
       const locationsToGeocode: { name: string, description: string, address: string, day: number }[] = [];
-      itinerary.dailyItinerary.forEach((day: any) => {
-        day.activities.forEach((act: any) => locationsToGeocode.push({ ...act, day: day.day }));
-        day.restaurants.forEach((res: any) => locationsToGeocode.push({ ...res, day: day.day }));
+      itinerary.dailyItinerary.forEach((day: Day) => {
+        day.activities.forEach((act: Activity) => locationsToGeocode.push({ ...act, day: day.day }));
+        day.restaurants.forEach((res: Restaurant) => locationsToGeocode.push({ ...res, day: day.day }));
       });
       
       const geocodedPins: Pin[] = [];

@@ -3,12 +3,14 @@
 import { useState, ChangeEvent, useMemo, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Sparkles, Star, Heart, Compass, ArrowLeft } from "lucide-react"
+import { ArrowRight, Sparkles, Star, Compass, ArrowLeft } from "lucide-react"
 import { oracleSteps } from "@/lib/oracle-data"
 import { useAuth } from "../context/auth-context"
 import AuthScreen from "./auth-screen"
+import type { SoulProfile } from '@/lib/types';
+
+// GeoDB Cities API endpoint
+const CITIES_API = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities"
 
 type FormData = {
   archetype: string
@@ -25,21 +27,13 @@ type FormData = {
 }
 
 interface PreDepartureOracleProps {
-  onComplete: (answers: any) => void
+  onComplete: (answers: SoulProfile) => void
   onBack?: () => void
 }
 
-// 静态城市/国家列表
-const DESTINATION_LIST = [
-  "London", "Istanbul", "Vienna", "Paris", "New York", "Tokyo", "Sydney", "Berlin", "Rome", "Barcelona", "Beijing", "Shanghai", "Moscow", "Dubai", "Bangkok", "Singapore", "Los Angeles", "San Francisco", "Toronto", "Seoul", "Hong Kong"
-];
-
-const COUNTRY_API = "https://restcountries.com/v3.1/all";
-const CITIES_API = "https://wft-geo-db.p.rapidapi.com/v1/geo/cities";
-
 // 顶层定义 transformFormData
 function transformFormData(formData: FormData) {
-  const transformed: any = {};
+  const transformed: Record<string, unknown> = {};
   oracleSteps.forEach(step => {
     if (step.id === 'practical') return;
     const value = formData[step.id as keyof FormData];
@@ -85,7 +79,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [pendingItinerary, setPendingItinerary] = useState<any>(null);
+  const [pendingItinerary, setPendingItinerary] = useState<unknown>(null);
   // 1. 增加搜索历史 state
   const [destinationHistory, setDestinationHistory] = useState<string[]>([]);
 
@@ -108,7 +102,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
       });
       const data = await res.json();
       if (data.data) {
-        cities = data.data.map((c: any, idx: number) => ({
+        cities = data.data.map((c: Record<string, unknown>, idx: number) => ({
           label: `${c.city}, ${c.country}`,
           value: `${c.city}, ${c.country}`,
           key: c.id ? `${c.id}` : `${c.city},${c.country},${idx}`
@@ -158,7 +152,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     const moodStep = oracleSteps.find(step => step.id === 'mood');
     if (formData.mood && moodStep && moodStep.options) {
       const moodOption = moodStep.options.find((opt) => opt.value === formData.mood)
-      return moodOption?.bgColor || "bg-slate-900/20"
+      return (moodOption as { bgColor?: string })?.bgColor || "bg-slate-900/20"
     }
     return "bg-slate-900/20"
   }
@@ -216,12 +210,12 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
   // itinerary 生成完毕后，onComplete
   useEffect(() => {
     if (pendingItinerary) {
-      onComplete(pendingItinerary);
+      onComplete(pendingItinerary as SoulProfile);
       setPendingItinerary(null);
     }
   }, [pendingItinerary, onComplete]);
 
-  const handleComplete = async () => {
+  const handleComplete = async (): Promise<void> => {
     console.log('handleComplete called');
     const finalAnswers = transformFormData(formData);
     console.log('finalAnswers:', finalAnswers);
@@ -239,7 +233,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
       // 合并 practical 字段，确保 itinerary 页面能拿到 quiz 输入
       const merged = { ...data, practical: finalAnswers.practical };
       console.log('onComplete will be called with:', merged);
-      onComplete(merged);
+      onComplete(merged as SoulProfile);
     } catch (e) {
       setGenerationError("Failed to generate itinerary. Please try again later.");
       setIsGenerating(false);
@@ -580,7 +574,15 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                         : `border-white/20 bg-white/5 hover:border-purple-400/50`
                     }`}
                     tabIndex={0}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') currentStepData.multiSelect ? handleMultiSelect(option.value) : handleSingleSelect(id, option.value); }}
+                    onKeyDown={e => { 
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        if (currentStepData.multiSelect) {
+                          handleMultiSelect(option.value);
+                        } else {
+                          handleSingleSelect(id, option.value);
+                        }
+                      }
+                    }}
                     role="button"
                     aria-pressed={isSelected}
                   >

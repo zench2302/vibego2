@@ -21,13 +21,14 @@ import {
   Users,
   Star,
   Plus,
-  ArrowLeft,
 } from "lucide-react"
+import type { Itinerary, SoulProfile, Activity } from "@/lib/types"
+import Image from 'next/image';
 
 interface SharingRealmProps {
-  journeyBlueprint: any
-  soulProfile: any
-  onCreateNew?: () => void
+  journeyBlueprint: Itinerary;
+  soulProfile: SoulProfile;
+  onCreateNew?: () => void;
 }
 
 export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNew }: SharingRealmProps) {
@@ -67,7 +68,7 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                 Share Your Sacred Journey
               </CardTitle>
             </div>
-            <p className="text-slate-300 text-lg">Invite kindred spirits to witness your soul's adventure</p>
+            <p className="text-slate-300 text-lg">Invite kindred spirits to witness your soul&#39;s adventure</p>
           </CardHeader>
         </Card>
 
@@ -85,7 +86,7 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
               <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg border border-white/10">
                 <div className="text-4xl">{soulProfile.archetype.emoji}</div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-slate-100">{journeyBlueprint.title}</h3>
+                  <h3 className="text-xl font-bold text-slate-100">{journeyBlueprint.tripTitle}</h3>
                   <div className="flex items-center gap-4 mt-2 text-sm text-slate-300">
                     <span className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
@@ -93,7 +94,7 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {journeyBlueprint.duration} days
+                      {journeyBlueprint.dailyItinerary?.length || 0} days
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
@@ -102,7 +103,7 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                   </div>
                 </div>
                 <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-                  <Star className="h-3 w-3 mr-1" />${journeyBlueprint.totalBudget} Budget
+                  <Star className="h-3 w-3 mr-1" />$Budget TBD
                 </Badge>
               </div>
 
@@ -110,9 +111,9 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
               <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                 <h4 className="font-semibold mb-3 text-slate-200">Day 1 Preview - Day of Wonder</h4>
                 <div className="grid md:grid-cols-2 gap-3">
-                  {journeyBlueprint.days[0]?.activities.slice(0, 2).map((activity: any, index: number) => (
+                  {journeyBlueprint.dailyItinerary?.[0]?.activities.slice(0, 2).map((activity: Activity, index: number) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-white/5 rounded border border-white/10">
-                      <span className="text-lg">{activity.icon}</span>
+                      <span className="text-lg">{activity.emoji}</span>
                       <span className="text-sm text-slate-300">{activity.name}</span>
                     </div>
                   ))}
@@ -121,8 +122,8 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
 
               {/* Mystical Quote */}
               <div className="text-center p-4 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-lg border border-purple-400/20">
-                <p className="text-lg italic text-purple-100 mb-2">"{soulProfile.soulQuote}"</p>
-                <p className="text-sm text-slate-400">— Your Soul's Wisdom</p>
+                <p className="text-lg italic text-purple-100 mb-2">&quot;{String(soulProfile.soulQuote || 'Your journey awaits...')}&quot;</p>
+                <p className="text-sm text-slate-400">— Your Soul&#39;s Wisdom</p>
               </div>
             </div>
           </CardContent>
@@ -201,10 +202,11 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
               {showQR ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-white rounded-lg inline-block">
-                    <img
+                    <Image
                       src={generateQRCode() || "/placeholder.svg"}
                       alt="Journey QR Code"
-                      className="w-48 h-48 mx-auto"
+                      width={192}
+                      height={192}
                     />
                   </div>
                   <p className="text-sm text-slate-300">Scan to enter the journey realm</p>
@@ -309,7 +311,7 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                 Journey Oracle Complete
               </Badge>
 
-              <p className="text-sm text-purple-200">✨ Your soul's adventure begins now ✨</p>
+              <p className="text-sm text-purple-200">✨ Your soul&#39;s adventure begins now ✨</p>
 
               {onCreateNew && (
                 <div className="pt-4">
