@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getAuthClient } from '@/lib/firebase';
 import { User } from 'firebase/auth';
 import { LogOut, BookOpen, Plus } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -72,7 +72,10 @@ export default function Header({ user }: HeaderProps) {
                   Welcome, <span className="text-purple-600">{user.email?.split('@')[0]}</span>
                 </p>
                 <Button 
-                  onClick={() => signOut(auth)} 
+                  onClick={async () => {
+                    const auth = await getAuthClient();
+                    if (auth) signOut(auth);
+                  }} 
                   variant="outline" 
                   size="sm" 
                   className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 bg-white transition-colors"
