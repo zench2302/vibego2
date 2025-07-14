@@ -295,6 +295,9 @@ export default function MyJourneys() {
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
+  // 调试用日志
+  console.log('MyJourneys render', { user, authLoading });
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -302,7 +305,11 @@ export default function MyJourneys() {
       return;
     }
 
+    // loading 超时兜底
+    const timeout = setTimeout(() => setLoading(false), 10000);
+
     const fetchJourneys = async () => {
+      if (typeof window === "undefined") return; // 防止 SSR 误调用
       try {
         const db = await getDbClient();
         const q = query(collection(db, "users", user.uid, "journeys"), orderBy("createdAt", "desc"));
@@ -316,7 +323,12 @@ export default function MyJourneys() {
       }
     };
 
+    // 调试用
+    console.log('user:', user);
+    console.log('authLoading:', authLoading);
+
     fetchJourneys();
+    return () => clearTimeout(timeout);
   }, [user, authLoading, router]);
 
   const handleDeleteClick = (journeyId: string, journeyTitle: string, e: React.MouseEvent) => {

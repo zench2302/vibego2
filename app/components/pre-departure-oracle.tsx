@@ -52,6 +52,10 @@ function transformFormData(formData: FormData) {
     companions: formData.companions,
     specialRequests: formData.specialRequests,
   };
+  // 顶层补全
+  transformed.destination = formData.destination;
+  transformed.startDate = formData.startDate;
+  transformed.endDate = formData.endDate;
   return transformed;
 }
 
@@ -210,18 +214,23 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
   // itinerary 生成完毕后，onComplete
   useEffect(() => {
     if (pendingItinerary) {
-      onComplete(pendingItinerary as SoulProfile);
+      // pendingItinerary 只是触发信号，实际要用 quiz 的 finalAnswers 构造 SoulProfile
+      const finalAnswers = transformFormData(formData) as SoulProfile;
+      onComplete(finalAnswers);
       setPendingItinerary(null);
     }
   }, [pendingItinerary, onComplete]);
 
+  // 1. 优化 handleComplete，确保 loading 状态和参数完整
   const handleComplete = async (): Promise<void> => {
-    console.log('handleComplete called');
-    const finalAnswers = transformFormData(formData);
-    console.log('finalAnswers:', finalAnswers);
+    if (!formData.destination || !formData.startDate || !formData.endDate) {
+      setGenerationError("Please select a destination and valid dates.");
+      return;
+    }
     setIsGenerating(true);
     setGenerationError(null);
     try {
+      const finalAnswers = transformFormData(formData);
       const res = await fetch("/api/generate-itinerary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -230,16 +239,25 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
       if (!res.ok) throw new Error("Failed to generate itinerary");
       const data = await res.json();
       setIsGenerating(false);
-      // 合并 practical 字段，确保 itinerary 页面能拿到 quiz 输入
-      const merged = { ...data, practical: finalAnswers.practical };
-      console.log('onComplete will be called with:', merged);
+      // 强制同步 practical 字段到顶层
+      const practical = (finalAnswers.practical as any) || {};
+      const merged = {
+        ...data,
+        ...finalAnswers,
+        practical,
+        destination: practical.destination,
+        startDate: practical.startDate,
+        endDate: practical.endDate,
+        budget: practical.budget,
+        companions: practical.companions,
+      };
       onComplete(merged as SoulProfile);
     } catch (e) {
       setGenerationError("Failed to generate itinerary. Please try again later.");
       setIsGenerating(false);
       console.error(e);
     }
-  }
+  };
 
   const handleNextStep = () => {
     if (currentStep < oracleSteps.length - 1) {
@@ -258,6 +276,16 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     const value = formData[id]
     return Array.isArray(value) ? value.length > 0 : !!value
   }
+
+  // 在 journey logistics 步骤，校验所有字段
+  const isLogisticsStep = currentStepData.id === 'practical';
+  const logisticsValid = isLogisticsStep ? (
+    !!formData.destination &&
+    !!formData.startDate &&
+    !!formData.endDate &&
+    !!formData.budget &&
+    !!formData.companions
+  ) : true;
 
   if (currentStepData.practical) {
     return (
@@ -344,7 +372,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                     className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:border-purple-400 focus:outline-none backdrop-blur-sm"
                   />
                   {/* 下拉选择框，仅城市 */}
-                  {destinationDropdown && cityOptions.length > 0 && (
+                  {destinationDropdown && destinationQuery && cityOptions.length > 0 && (
                     <div className="absolute z-20 mt-1 w-full bg-white/90 rounded-lg shadow-lg max-h-64 overflow-auto">
                       {cityOptions.map(opt => (
                         <div
@@ -361,7 +389,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
                       )}
                     </div>
                   )}
-                  {destinationDropdown && destinationHistory.length > 0 && (
+                  {destinationDropdown && !destinationQuery && destinationHistory.length > 0 && (
                     <div className="absolute z-20 mt-1 w-full bg-white rounded-lg shadow-lg max-h-32 overflow-auto top-full left-0">
                       <div className="px-4 py-2 text-xs text-gray-500">Recent Searches</div>
                       {destinationHistory.map((item, idx) => (
@@ -473,7 +501,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
     )
   }
   
-  // loading页渲染
+  // 4. 优先渲染 loading UI
   if (isGenerating && !showAuthModal) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 flex flex-col items-center justify-center">
@@ -601,7 +629,7 @@ export default function PreDepartureOracle({ onComplete, onBack }: PreDepartureO
             <div className="text-center pt-6">
               <Button
                 onClick={handleNextStep}
-                disabled={!canProceed() || isGenerating}
+                disabled={!canProceed() || !logisticsValid}
                 size="lg"
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
               >

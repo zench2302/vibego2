@@ -17,9 +17,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    console.log('AuthProvider: useEffect mount');
     getAuthClient().then(auth => {
+      console.log('AuthProvider: getAuthClient resolved', auth);
       if (!auth) return;
       unsubscribe = onAuthStateChanged(auth, (user) => {
+        console.log('AuthProvider: onAuthStateChanged', user);
         setUser(user);
         setLoading(false);
       });

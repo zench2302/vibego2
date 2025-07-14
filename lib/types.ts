@@ -30,6 +30,11 @@ export interface Itinerary {
   soulQuote?: string;
   soulProfile?: SoulProfile;
   createdAt?: string;
+  // 新增字段
+  budget?: number | string;
+  companions?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 // SoulProfile 类型

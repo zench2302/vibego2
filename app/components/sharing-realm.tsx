@@ -87,23 +87,34 @@ export default function SharingRealm({ journeyBlueprint, soulProfile, onCreateNe
                 <div className="text-4xl">{soulProfile.archetype.emoji}</div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-slate-100">{journeyBlueprint.tripTitle}</h3>
+                  {/* 展示目的地、天数、出行方式、预算时，优先用 journeyBlueprint 顶层字段，没有再用 practical 字段 */}
                   <div className="flex items-center gap-4 mt-2 text-sm text-slate-300">
                     <span className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {journeyBlueprint.destination}
+                      {(journeyBlueprint as any).destination ?? (journeyBlueprint as any).practical?.destination ?? ''}
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {journeyBlueprint.dailyItinerary?.length || 0} days
+                      {(() => {
+                        const anyJ = journeyBlueprint as any;
+                        const start = anyJ?.startDate ? new Date(anyJ.startDate) : anyJ.practical?.startDate ? new Date(anyJ.practical.startDate) : null;
+                        const end = anyJ?.endDate ? new Date(anyJ.endDate) : anyJ.practical?.endDate ? new Date(anyJ.practical.endDate) : null;
+                        if (start && end) {
+                          const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                          return `${diff} days`;
+                        }
+                        return '';
+                      })()}
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      {soulProfile.practical.companions}
+                      {(soulProfile as any).practical?.companions ?? (journeyBlueprint as any).companions ?? (journeyBlueprint as any).practical?.companions ?? ''}
                     </span>
                   </div>
                 </div>
                 <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-                  <Star className="h-3 w-3 mr-1" />$Budget TBD
+                  <Star className="h-3 w-3 mr-1" />
+                  ${(journeyBlueprint as any).budget ?? (journeyBlueprint as any).practical?.budget ?? 'Budget TBD'}
                 </Badge>
               </div>
 

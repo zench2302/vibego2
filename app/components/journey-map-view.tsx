@@ -59,6 +59,13 @@ export default function JourneyMapView({ itinerary, completedItems }: JourneyMap
   useEffect(() => {
     const geocodeLocations = async () => {
       if (!itinerary || !apiKey) return;
+      // 新增：destination 为空或 Unknown 时直接 return
+      if (!itinerary.destination || itinerary.destination === 'Unknown' || itinerary.destination === 'Unknown Destination') {
+        setLoading(false);
+        setCenter(null);
+        console.warn('No valid destination to geocode.');
+        return;
+      }
       setLoading(true);
 
       try {
@@ -113,7 +120,8 @@ export default function JourneyMapView({ itinerary, completedItems }: JourneyMap
   }, [itinerary, apiKey, completedItems]);
 
   if (!apiKey) return <div className="p-4 text-center">Error: API key missing.</div>;
-  if (loading || !center) return <div className="h-[500px] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  if (loading) return <div className="h-[500px] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  if (!center) return <div className="h-[500px] flex items-center justify-center text-gray-500">No valid destination to display on the map.</div>;
 
   const hoveredPin = pins.find(p => p.key === hoveredPinKey);
 

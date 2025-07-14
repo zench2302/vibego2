@@ -295,7 +295,7 @@ export default function ItineraryDisplay({
         const response = await fetch("/api/generate-itinerary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ soulProfile }),
+          body: JSON.stringify({ soulProfile: { ...soulProfile, practical: { ...soulProfile.practical } } }),
         })
 
         if (!response.ok) {
@@ -304,6 +304,7 @@ export default function ItineraryDisplay({
         }
 
         const data = await response.json()
+        console.log('LLM itinerary raw response:', data)
         setItinerary(data)
       } catch (e: unknown) {
         console.error("Failed to generate itinerary:", e);
@@ -521,43 +522,38 @@ export default function ItineraryDisplay({
               <div className="flex items-center gap-4">
                 <span className="text-4xl">{soulProfile?.archetype?.emoji || '🌟'}</span>
                 <div>
+                  {/* 顶部渲染全部只用 itinerary 字段 */}
                   <CardTitle className="text-2xl sm:text-3xl font-bold text-gray-100 flex items-center gap-2">
-                    {itinerary?.tripTitle || 'Your Journey'}
-                    {existingItinerary && (
-                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 border-blue-200">
-                        Saved Journey
-                      </Badge>
-                    )}
+                    {itinerary?.tripTitle}
                   </CardTitle>
                   {itinerary?.soulQuote && (
                     <div className="text-center italic text-gray-200 text-base font-medium mt-1">
-                      {`"${itinerary.soulQuote}"`}
+                      {itinerary.soulQuote.replace(/^"|"$/g, '')}
                     </div>
                   )}
                   <CardDescription className="text-base sm:text-lg flex flex-wrap items-center gap-4 sm:gap-6 mt-2 text-gray-300 relative">
-                    {/* Days (not editable) */}
                     <div className="relative flex items-center gap-1 font-semibold">
                       <Calendar className="h-5 w-5" />
                       {(() => {
-                        const start = displayStartDate
-                        const end = displayEndDate
-                        const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-                        return `${diff} days (${start.toLocaleDateString('en-GB')} - ${end.toLocaleDateString('en-GB')})`
+                        const start = itinerary?.startDate ? new Date(itinerary.startDate) : null;
+                        const end = itinerary?.endDate ? new Date(itinerary.endDate) : null;
+                        if (start && end) {
+                          const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                          return `${diff} days (${start.toLocaleDateString('en-GB')} - ${end.toLocaleDateString('en-GB')})`;
+                        }
+                        return '';
                       })()}
                     </div>
-                    {/* Budget (not editable) */}
                     <div className="relative flex items-center font-semibold">
-                      ${displayBudget}
+                      ${itinerary?.budget}
                     </div>
-                    {/* Companions (not editable) */}
                     <div className="relative flex items-center gap-1 font-semibold">
                       <Users className="h-5 w-5" />
-                      {formatCompanions(displayCompanions)}
+                      {formatCompanions(itinerary?.companions || '')}
                     </div>
-                    {/* Destination (not editable) */}
                     <div className="relative flex items-center gap-1 font-semibold">
                       <MapPin className="h-5 w-5" />
-                      {soulProfile.practical.destination}
+                      {itinerary?.destination}
                     </div>
                   </CardDescription>
                 </div>
@@ -832,7 +828,10 @@ export default function ItineraryDisplay({
                     </span>
                   </div>
                 </div>
-                <JourneyMapView itinerary={itinerary} completedItems={completedItems} />
+                <JourneyMapView itinerary={{
+                  ...itinerary,
+                  destination: itinerary.destination || (itinerary as any).practical?.destination || '',
+                }} completedItems={completedItems} />
               </CardContent>
             </Card>
           </TabsContent>
