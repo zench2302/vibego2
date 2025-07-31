@@ -3,9 +3,10 @@
 import { useEffect, useState, memo } from 'react';
 import { APIProvider, Map, AdvancedMarker, useMap, InfoWindow } from '@vis.gl/react-google-maps';
 import { DAY_COLOR_SCHEMES } from './constants';
+import type { Itinerary, Day, Activity, Restaurant } from "@/lib/types"
 
 interface JourneyMapViewProps {
-  itinerary: any;
+  itinerary: Itinerary;
   completedItems: Set<string>;
 }
 
@@ -58,6 +59,13 @@ export default function JourneyMapView({ itinerary, completedItems }: JourneyMap
   useEffect(() => {
     const geocodeLocations = async () => {
       if (!itinerary || !apiKey) return;
+      // 新增：destination 为空或 Unknown 时直接 return
+      if (!itinerary.destination || itinerary.destination === 'Unknown' || itinerary.destination === 'Unknown Destination') {
+        setLoading(false);
+        setCenter(null);
+        console.warn('No valid destination to geocode.');
+        return;
+      }
       setLoading(true);
 
       try {
@@ -73,9 +81,9 @@ export default function JourneyMapView({ itinerary, completedItems }: JourneyMap
       }
 
       const locationsToGeocode: { name: string, description: string, address: string, day: number }[] = [];
-      itinerary.dailyItinerary.forEach((day: any) => {
-        day.activities.forEach((act: any) => locationsToGeocode.push({ ...act, day: day.day }));
-        day.restaurants.forEach((res: any) => locationsToGeocode.push({ ...res, day: day.day }));
+      itinerary.dailyItinerary.forEach((day: Day) => {
+        day.activities.forEach((act: Activity) => locationsToGeocode.push({ ...act, day: day.day }));
+        day.restaurants.forEach((res: Restaurant) => locationsToGeocode.push({ ...res, day: day.day }));
       });
       
       const geocodedPins: Pin[] = [];
@@ -112,7 +120,8 @@ export default function JourneyMapView({ itinerary, completedItems }: JourneyMap
   }, [itinerary, apiKey, completedItems]);
 
   if (!apiKey) return <div className="p-4 text-center">Error: API key missing.</div>;
-  if (loading || !center) return <div className="h-[500px] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  if (loading) return <div className="h-[500px] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  if (!center) return <div className="h-[500px] flex items-center justify-center text-gray-500">No valid destination to display on the map.</div>;
 
   const hoveredPin = pins.find(p => p.key === hoveredPinKey);
 

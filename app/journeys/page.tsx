@@ -2,13 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/auth-context';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { getDbClient } from '@/lib/firebase';
+import { collection, query, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dna, Calendar, MapPin, ArrowLeft, Plus, Eye, Trash2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import type { Day, Activity, Restaurant, SoulProfile } from '@/lib/types';
+
+type JourneyData = {
+  soulProfile?: SoulProfile;
+  destination?: string;
+  tripTitle?: string;
+  createdAt?: { seconds?: number };
+  dailyItinerary?: Day[];
+  completedItems?: string[];
+  id?: string;
+};
 
 // Country to flag emoji mapping
 const getCountryFlag = (destination: string): string => {
@@ -125,17 +136,33 @@ const getCountryFlag = (destination: string): string => {
 };
 
 // Generate journey summary based on archetype and itinerary
-const generateJourneySummary = (journey: any): string => {
-  const archetype = journey.soulProfile?.archetype?.name?.toLowerCase() || '';
-  const destination = journey.destination || '';
-  const days = journey.dailyItinerary?.length || 0;
-  const totalActivities = journey.dailyItinerary?.reduce((total: number, day: any) => 
-    total + (day.activities?.length || 0) + (day.restaurants?.length || 0), 0) || 0;
+const generateJourneySummary = (journey: unknown): string => {
+  // 类型守卫
+  const hasSoulProfile = typeof journey === 'object' && journey !== null && 'soulProfile' in journey;
+  const soulProfile = hasSoulProfile ? (journey as JourneyData).soulProfile : undefined;
+  const archetype = soulProfile?.archetype?.name?.toLowerCase?.() || '';
+
+  const destination = (typeof journey === 'object' && journey !== null && 'destination' in journey)
+    ? (journey as JourneyData).destination || ''
+    : '';
+
+  const dailyItinerary = (typeof journey === 'object' && journey !== null && 'dailyItinerary' in journey)
+    ? (journey as JourneyData).dailyItinerary || []
+    : [];
+
+  const days = dailyItinerary.length || 0;
+  const totalActivities = dailyItinerary.reduce(
+    (total: number, day: Day) =>
+      total + (Array.isArray(day.activities) ? (day.activities as Activity[]).length : 0) +
+      (Array.isArray(day.restaurants) ? (day.restaurants as Restaurant[]).length : 0),
+    0
+  );
 
   // Get some sample activities for context
-  const sampleActivities = journey.dailyItinerary?.slice(0, 2)
-    .flatMap((day: any) => day.activities?.slice(0, 2) || [])
-    .map((activity: any) => activity.name)
+  const sampleActivities = dailyItinerary
+    .slice(0, 2)
+    .flatMap((day: Day) => Array.isArray(day.activities) ? (day.activities as Activity[]).slice(0, 2) : [])
+    .map((activity: Activity) => activity?.name)
     .filter(Boolean) || [];
 
   // Archetype-based summary templates
@@ -224,7 +251,7 @@ const DeleteConfirmation = ({ isOpen, journeyTitle, onConfirm, onCancel, isDelet
         </CardHeader>
         <CardContent className="text-center space-y-4">
           <p className="text-gray-600">
-            Are you sure you want to delete <span className="font-semibold">"{journeyTitle}"</span>?
+            Are you sure you want to delete <span className="font-semibold">&quot;{journeyTitle}&quot;</span>?
           </p>
           <p className="text-sm text-red-600">
             This action cannot be undone.
@@ -254,7 +281,7 @@ const DeleteConfirmation = ({ isOpen, journeyTitle, onConfirm, onCancel, isDelet
 
 export default function MyJourneys() {
   const { user, loading: authLoading } = useAuth();
-  const [journeys, setJourneys] = useState<any[]>([]);
+  const [journeys, setJourneys] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
@@ -268,6 +295,9 @@ export default function MyJourneys() {
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
+  // 调试用日志
+  console.log('MyJourneys render', { user, authLoading });
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -275,12 +305,14 @@ export default function MyJourneys() {
       return;
     }
 
+    // loading 超时兜底
+    const timeout = setTimeout(() => setLoading(false), 10000);
+
     const fetchJourneys = async () => {
+      if (typeof window === "undefined") return; // 防止 SSR 误调用
       try {
-        const q = query(
-          collection(db, "users", user.uid, "journeys"),
-          orderBy("createdAt", "desc")
-        );
+        const db = await getDbClient();
+        const q = query(collection(db, "users", user.uid, "journeys"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         const journeysData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setJourneys(journeysData);
@@ -291,7 +323,12 @@ export default function MyJourneys() {
       }
     };
 
+    // 调试用
+    console.log('user:', user);
+    console.log('authLoading:', authLoading);
+
     fetchJourneys();
+    return () => clearTimeout(timeout);
   }, [user, authLoading, router]);
 
   const handleDeleteClick = (journeyId: string, journeyTitle: string, e: React.MouseEvent) => {
@@ -308,10 +345,11 @@ export default function MyJourneys() {
 
     setIsDeleting(true);
     try {
+      const db = await getDbClient();
       await deleteDoc(doc(db, "users", user.uid, "journeys", deleteModal.journeyId));
       
       // Remove from local state
-      setJourneys(prev => prev.filter(journey => journey.id !== deleteModal.journeyId));
+      setJourneys(prev => prev.filter(journey => (journey as JourneyData).id !== deleteModal.journeyId));
       
       // Close modal
       setDeleteModal({ isOpen: false, journeyId: '', journeyTitle: '' });
@@ -386,133 +424,144 @@ export default function MyJourneys() {
             </Card>
           ) : (
             <div className="grid gap-6">
-              {journeys.map(journey => (
-                <Card 
-                  key={journey.id} 
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-300 cursor-pointer group"
-                  onClick={() => router.push(`/journeys/${journey.id}`)}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <span className="text-4xl">{getCountryFlag(journey.destination || '')}</span>
-                        <div>
-                          <CardTitle className="text-xl sm:text-2xl group-hover:text-purple-300 transition-colors">
-                            {journey.tripTitle}
-                          </CardTitle>
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm mt-2">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" /> 
-                              {journey.destination}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" /> 
-                              {journey.createdAt?.seconds ? new Date(journey.createdAt.seconds * 1000).toLocaleDateString() : 'Unknown date'}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Dna className="h-4 w-4" /> 
-                              {journey.soulProfile?.archetype?.name || 'Traveler'}
-                            </span>
+              {journeys.map(journey => {
+                const hasSoulProfile = typeof journey === 'object' && journey !== null && 'soulProfile' in journey;
+                const j = journey as JourneyData;
+                const soulProfile = hasSoulProfile ? j.soulProfile : undefined;
+                const archetypeName = soulProfile?.archetype?.name || 'Traveler';
+                const archetypeEmoji = soulProfile?.archetype?.emoji;
+                const destination = j.destination || '';
+                const tripTitle = j.tripTitle || '';
+                const createdAt = j.createdAt;
+                const dailyItinerary = j.dailyItinerary || [];
+                const completedItems = j.completedItems || [];
+
+                return (
+                  <Card 
+                    key={j.id}
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-300 cursor-pointer group"
+                    onClick={() => router.push(`/journeys/${j.id}`)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <span className="text-4xl">{getCountryFlag(destination || '')}</span>
+                          <div>
+                            <CardTitle className="text-xl sm:text-2xl group-hover:text-purple-300 transition-colors">
+                              {tripTitle}
+                            </CardTitle>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm mt-2">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-4 w-4" /> 
+                                {destination}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" /> 
+                                {createdAt?.seconds ? new Date(createdAt.seconds * 1000).toLocaleDateString() : 'Unknown date'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Dna className="h-4 w-4" /> 
+                                {archetypeName}
+                              </span>
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-300 hover:text-white hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/journeys/${j.id}`);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-300 hover:text-red-200 hover:bg-red-500/20"
+                            onClick={(e) => handleDeleteClick(j.id || '', tripTitle, e)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-purple-300 hover:text-white hover:bg-white/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/journeys/${journey.id}`);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-300 hover:text-red-200 hover:bg-red-500/20"
-                          onClick={(e) => handleDeleteClick(journey.id, journey.tripTitle, e)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-purple-100 text-sm sm:text-base mb-4">
-                      {generateJourneySummary(journey)}
-                    </p>
-                    
-                    {/* Progress Bar */}
-                    {journey.dailyItinerary && (
-                      <div className="mb-4">
-                        {(() => {
-                          const totalItems = journey.dailyItinerary.reduce((total: number, day: any) => 
-                            total + (day.activities?.length || 0) + (day.restaurants?.length || 0), 0);
-                          const completedItems = journey.completedItems?.length || 0;
-                          const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-                          
-                          return (
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center text-xs text-purple-200">
-                                <span>Journey Progress</span>
-                                <span>{percentage}% Complete</span>
-                              </div>
-                              <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-500 ease-out rounded-full"
-                                  style={{ width: `${percentage}%` }}
-                                ></div>
-                              </div>
-                              <div className="text-xs text-purple-300">
-                                {completedItems} of {totalItems} activities completed
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {journey.dailyItinerary && (
-                      <div className="flex items-center gap-4 text-sm text-slate-300">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {journey.dailyItinerary.length} days
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {journey.dailyItinerary.reduce((total: number, day: any) => total + (day.activities?.length || 0) + (day.restaurants?.length || 0), 0)} activities
-                        </span>
-                        {journey.soulProfile?.archetype?.emoji && (
-                          <>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              {journey.soulProfile.archetype.emoji} {journey.soulProfile.archetype.name}
-                            </span>
-                          </>
-                        )}
-                        {/* Completion Progress */}
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
-                            <span className="text-[8px] text-white font-bold">✓</span>
-                          </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-purple-100 text-sm sm:text-base mb-4">
+                        {generateJourneySummary(journey)}
+                      </p>
+                      {/* Progress Bar */}
+                      {Array.isArray(dailyItinerary) && dailyItinerary.length > 0 && (
+                        <div className="mb-4">
                           {(() => {
-                            const totalItems = journey.dailyItinerary.reduce((total: number, day: any) => 
-                              total + (day.activities?.length || 0) + (day.restaurants?.length || 0), 0);
-                            const completedItems = journey.completedItems?.length || 0;
-                            const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-                            return `${percentage}% complete`;
+                            const totalItems = dailyItinerary.reduce((total: number, day: Day) => 
+                              total + (Array.isArray(day.activities) ? (day.activities as Activity[]).length : 0) + (Array.isArray(day.restaurants) ? (day.restaurants as Restaurant[]).length : 0), 0);
+                            const completed = Array.isArray(completedItems) ? completedItems.length : 0;
+                            const percentage = totalItems > 0 ? Math.round((completed / totalItems) * 100) : 0;
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center text-xs text-purple-200">
+                                  <span>Journey Progress</span>
+                                  <span>{percentage}% Complete</span>
+                                </div>
+                                <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
+                                  <div 
+                                    className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-500 ease-out rounded-full"
+                                    style={{ width: `${percentage}%` }}
+                                  ></div>
+                                </div>
+                                <div className="text-xs text-purple-300">
+                                  {completed} of {totalItems} activities completed
+                                </div>
+                              </div>
+                            );
                           })()}
-                        </span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                        </div>
+                      )}
+                      {Array.isArray(dailyItinerary) && dailyItinerary.length > 0 && (
+                        <div className="flex items-center gap-4 text-sm text-slate-300">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {dailyItinerary.length} days
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {dailyItinerary.reduce((total: number, day: Day) => total + (Array.isArray(day.activities) ? (day.activities as Activity[]).length : 0) + (Array.isArray(day.restaurants) ? (day.restaurants as Restaurant[]).length : 0), 0)} activities
+                          </span>
+                          {archetypeEmoji && (
+                            <>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                {archetypeEmoji} {archetypeName}
+                              </span>
+                            </>
+                          )}
+                          {/* Completion Progress */}
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                              <span className="text-[8px] text-white font-bold">✓</span>
+                            </div>
+                            {(() => {
+                              const totalItems = dailyItinerary.reduce((total: number, day: Day) => 
+                                total + (Array.isArray(day.activities) ? (day.activities as Activity[]).length : 0) + (Array.isArray(day.restaurants) ? (day.restaurants as Restaurant[]).length : 0), 0);
+                              const completed = Array.isArray(completedItems) ? completedItems.length : 0;
+                              const percentage = totalItems > 0 ? Math.round((completed / totalItems) * 100) : 0;
+                              return `${percentage}% complete`;
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

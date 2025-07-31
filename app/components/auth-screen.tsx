@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getAuthClient } from '@/lib/firebase';
 import { Sparkles, ArrowLeft } from 'lucide-react';
 
 interface AuthScreenProps {
@@ -26,14 +26,16 @@ export default function AuthScreen({ onBack, onAuthStart }: AuthScreenProps) {
     setLoading(true);
     setError(null);
     try {
+      const auth = await getAuthClient();
+      if (!auth) throw new Error('Auth not available');
       if (action === 'signUp') {
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
       // On success, the main page will automatically rerender.
-    } catch (error: any) {
-      setError(error.message.replace('Firebase: ', ''));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
