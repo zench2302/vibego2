@@ -2,6 +2,7 @@
 
 ## Description
 An AI-assisted travel itinerary generator that combines OpenAI's GPT API with Google Maps data to produce city-specific, time-aware plans.
+You can try here: https://vibego2.vercel.app/
 
 ## Key Technologies  
 - OpenAI (GPT-4) for summarization and suggestion  
